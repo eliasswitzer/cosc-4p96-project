@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torchvision import transforms
 
-from pso import PSO, Particle, objective_function
+from pso import PSO, Particle
 
 # Set random seed
 seed = 10
@@ -30,12 +30,12 @@ search_bounds = [
 ]
 
 #test of multiobjective helper functions - find complexity score of random particle
-pso1 = PSO(num_particles=10,search_bounds=search_bounds)
+#pso1 = PSO(num_particles=10,search_bounds=search_bounds)
 #print(_complexity_score(pso1.particles[1].get_network_params()))
 #print(_get_complexity(pso1.particles[1].get_network_params()))
 
 pso = PSO(num_particles=10, search_bounds=search_bounds)
-best_position = pso.optimize(objective_function, num_iterations=3)
+best_position = pso.optimize(3, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, g)
 
 best = Particle(search_bounds)
 best.position = best_position
@@ -44,5 +44,5 @@ print("Best architecture found:", best.get_network_params())
 #debugging accuracy
 pso2 = PSO(num_particles=1,search_bounds=search_bounds)
 parameters = pso2.particles[0].get_network_params()
-objective_function(parameters)
+print(parameters)
 

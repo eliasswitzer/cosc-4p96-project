@@ -35,13 +35,12 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, fitness_function, num_iterations):
-
+  def optimize(self, num_iterations, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
-      fitness = fitness_function(parameters)
+      fitness = objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator)
       print(f"Particle {i+1} | Validation Loss: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -72,7 +71,7 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness = fitness_function(parameters)
+        fitness = objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator)
         print(f"Particle {i+1} | Test Loss: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
@@ -89,6 +88,43 @@ class PSO:
 
     best_position = self.global_best_position
     return best_position
+  
+  # Define multi objecive functions
+  def _get_complexity(self, network_params, train_dataset):
+      """#helper function for determining complexity by returning number of params"""
+      """network_params = dict of network parameters (ie. from pso.particles.get_network_params)"""
+      #NOTE: this only works if number of layers is consistent across each layer
+
+      num_layers = network_params['num_hidden_layers']
+      layer_size = network_params['hidden_layer_size']
+      len_input = len(train_dataset)
+      len_output = len(train_dataset.labels[0])
+
+      #middle calculation refers to weights of hidden layers - different when there are 1,2 or 3+ layers
+      middle_calculation = 0
+      if num_layers == 1:
+          middle_calculation = layer_size
+      elif num_layers == 2:
+          middle_calculation = layer_size**2
+      else:
+          middle_calculation = (num_layers-1) * (layer_size**2)
+
+      # this = weights on input + weights in hidden layer + weights on output
+      num_weights = ((len_input * layer_size) +
+                      middle_calculation +
+                      (layer_size * len_output))
+
+      # this = biases in hidden layers + biases in output
+      num_biases = ((num_layers * layer_size) +
+                    len_output)
+
+      return (num_weights + num_biases)
+
+  def _complexity_score(self, network_params):
+      """gets the complexity ranking of the particle by comparing it to the highest possible complexity"""
+      highest_score = self._get_complexity({'num_hidden_layers': 5, 'hidden_layer_size':1024})
+      curr_complexity = self._get_complexity(network_params)
+      return (curr_complexity/highest_score)
   
 class MLP(nn.Module):
   def __init__(self, input_dim, num_classes, num_layers, hidden_size, dropout_rate):
@@ -108,9 +144,31 @@ class MLP(nn.Module):
 
   def forward(self, x):
     return self.network(x.view(x.size(0), -1)) # flatten and pass through network
-  
+
+"""this function gets loss and accuracy with a given dataset and labels"""
+def eval_model(x_set,y_set,model):
+  with torch.no_grad(): #this disables gradient calculations
+
+    #sigmoid on each label to get the predictions the model has for each label?
+    crit = nn.Sigmoid()
+    outputs = crit(model(x_set))
+    # loss = criterion(outputs, y_set)
+    # crit = nn.BCEWithLogitsLoss()
+    # predictions = crit(outputs,y_set)
+
+    #conv to numpy and calculate accuracy and loss
+    numpy_pred = outputs.numpy()
+    y_valid_numpy = y_set.numpy()
+
+    numpy_pred = np.where(numpy_pred > 0.5 ,1,0)
+
+    acc = numpy_pred == y_valid_numpy
+    print("acc",acc)
+
+    return acc.astype(int).sum()/len(acc)
+
 # evalutate fitness of a particle by training a neural net on the parameters
-def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, overfitting_detection = 10):
+def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, g, epochs=5, overfitting_detection = 10):
   train_loader = DataLoader(train_dataset, batch_size=parameters['batch_size'], shuffle=True, generator=g)
   val_loader = DataLoader(val_dataset, batch_size=parameters['batch_size'], generator=g)
   test_loader = DataLoader(test_dataset, batch_size=parameters['batch_size'], generator=g)
@@ -187,43 +245,7 @@ def penalty_function(parameters, search_bounds):
 
     return penalty
 
-# Define multi objecive functions
 
-def _get_complexity(network_params, train_dataset):
-    """#helper function for determining complexity by returning number of params"""
-    """network_params = dict of network parameters (ie. from pso.particles.get_network_params)"""
-    #NOTE: this only works if number of layers is consistent across each layer
-
-    num_layers = network_params['num_hidden_layers']
-    layer_size = network_params['hidden_layer_size']
-    len_input = len(train_dataset)
-    len_output = len(train_dataset.labels[0])
-
-    #middle calculation refers to weights of hidden layers - different when there are 1,2 or 3+ layers
-    middle_calculation = 0
-    if num_layers == 1:
-        middle_calculation = layer_size
-    elif num_layers == 2:
-        middle_calculation = layer_size**2
-    else:
-        middle_calculation = (num_layers-1) * (layer_size**2)
-
-    # this = weights on input + weights in hidden layer + weights on output
-    num_weights = ((len_input * layer_size) +
-                    middle_calculation +
-                    (layer_size * len_output))
-
-    # this = biases in hidden layers + biases in output
-    num_biases = ((num_layers * layer_size) +
-                  len_output)
-
-    return (num_weights + num_biases)
-
-def _complexity_score(network_params):
-    """gets the complexity ranking of the particle by comparing it to the highest possible complexity"""
-    highest_score = _get_complexity({'num_hidden_layers': 5, 'hidden_layer_size':1024})
-    curr_complexity = _get_complexity(network_params)
-    return (curr_complexity/highest_score)
 
 def weighted_sums(alpha,beta,complexity,accuracy):
     """take a weighted sum of the accuracy and model size"""
@@ -231,9 +253,9 @@ def weighted_sums(alpha,beta,complexity,accuracy):
     return (alpha*complexity)+(beta*accuracy)
 
 # TODO: Make this our multi-objective function instead of just validation loss
-def objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes):
+def objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
   penalty = penalty_function(parameters, search_bounds)
   if penalty > 0:
     print("Infeasible architecture found!")
     return penalty
-  return evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5)
+  return evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, g=generator)
