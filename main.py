@@ -1,14 +1,22 @@
+import argparse
+
 import numpy as np
 import torch
 from torchvision import transforms
 
 from pso import PSO, Particle
 
+# Arguments
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-s', '--seed', metavar="seed", type=int, required=True, help="The random seed for reproducibility.")
+
+args = parser.parse_args()
+
 # Set random seed
-seed = 10
-np.random.seed(seed)
-torch.manual_seed(seed)
-g = torch.Generator().manual_seed(seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+g = torch.Generator().manual_seed(args.seed)
 
 # Load dataset
 from medmnist import ChestMNIST
