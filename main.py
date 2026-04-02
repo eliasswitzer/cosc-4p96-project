@@ -1,0 +1,48 @@
+import numpy as np
+import torch
+from torchvision import transforms
+
+from pso import PSO, Particle, objective_function
+
+# Set random seed
+seed = 10
+np.random.seed(seed)
+torch.manual_seed(seed)
+g = torch.Generator().manual_seed(seed)
+
+# Load dataset
+from medmnist import ChestMNIST
+train_dataset = ChestMNIST(split='train', transform=transforms.ToTensor(), download=True)
+val_dataset = ChestMNIST(split='val', transform=transforms.ToTensor(), download=True)
+test_dataset = ChestMNIST(split='test', transform=transforms.ToTensor(), download=True)
+
+num_classes = len(train_dataset.info['label'])
+input_dim = int(np.prod(train_dataset[0][0].shape))
+
+search_bounds = [
+    (1, 5), # number of hidden layers
+    (16, 1024), # number of nodes per layer
+    (0.00001, 0.1), # learning rate
+    (0.0, 0.99), # momentum
+    (8, 256), # batch size
+    (0.0, 0.1), # weight decay
+    (0.0, 0.7) # dropout rate
+]
+
+#test of multiobjective helper functions - find complexity score of random particle
+pso1 = PSO(num_particles=10,search_bounds=search_bounds)
+#print(_complexity_score(pso1.particles[1].get_network_params()))
+#print(_get_complexity(pso1.particles[1].get_network_params()))
+
+pso = PSO(num_particles=10, search_bounds=search_bounds)
+best_position = pso.optimize(objective_function, num_iterations=3)
+
+best = Particle(search_bounds)
+best.position = best_position
+print("Best architecture found:", best.get_network_params())
+
+#debugging accuracy
+pso2 = PSO(num_particles=1,search_bounds=search_bounds)
+parameters = pso2.particles[0].get_network_params()
+objective_function(parameters)
+
