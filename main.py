@@ -17,7 +17,7 @@ parser.add_argument('-c1', metavar='c1', type=float, required=False, default=1.4
 parser.add_argument('-c2', metavar='c2', type=float, required=False, default=1.49445, help="The social acceleration coefficient for PSO algorithm.")
 
 # Datasets
-parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest, retina, blood"], help="The dataset the MLP will be trained on.")
+parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "retina", "blood"], help="The dataset the MLP will be trained on.")
 
 args = parser.parse_args()
 

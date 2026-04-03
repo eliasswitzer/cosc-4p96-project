@@ -2,9 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchvision import transforms
 
-# TODO: tidy up code and move some functions into the PSO class
+from models import MLP
 
 class Particle:
   def __init__(self, search_bounds):
@@ -12,7 +11,7 @@ class Particle:
     num_dims = len(search_bounds)
 
     self.position = np.array([np.random.uniform(low, high) for low, high in search_bounds]) # initialize position randomly within bounds
-    self.velocity = np.zeros(7) # initialize velocities to zero
+    self.velocity = np.zeros(len(search_bounds)) # initialize velocities to zero
 
     self.best_position = self.position
     self.best_fitness = float('inf')
@@ -125,25 +124,6 @@ class PSO:
       highest_score = self._get_complexity({'num_hidden_layers': 5, 'hidden_layer_size':1024})
       curr_complexity = self._get_complexity(network_params)
       return (curr_complexity/highest_score)
-  
-class MLP(nn.Module):
-  def __init__(self, input_dim, num_classes, num_layers, hidden_size, dropout_rate):
-    super().__init__()
-    layers = []
-    next_num_features = input_dim
-
-    for i in range(num_layers):
-      layers.append(nn.Linear(next_num_features, hidden_size))
-      layers.append(nn.BatchNorm1d(hidden_size))
-      layers.append(nn.ReLU())
-      layers.append(nn.Dropout(dropout_rate))
-      next_num_features = hidden_size
-
-    layers.append(nn.Linear(hidden_size, num_classes))
-    self.network = nn.Sequential(*layers)
-
-  def forward(self, x):
-    return self.network(x.view(x.size(0), -1)) # flatten and pass through network
 
 """this function gets loss and accuracy with a given dataset and labels"""
 def eval_model(x_set,y_set,model):
@@ -157,13 +137,13 @@ def eval_model(x_set,y_set,model):
     # predictions = crit(outputs,y_set)
 
     #conv to numpy and calculate accuracy and loss
-    numpy_pred = outputs.numpy()
-    y_valid_numpy = y_set.numpy()
+    numpy_pred = outputs.cpu().numpy()
+    y_valid_numpy = y_set.cpu().numpy()
 
     numpy_pred = np.where(numpy_pred > 0.5 ,1,0)
 
     acc = numpy_pred == y_valid_numpy
-    print("acc",acc)
+    #print("acc",acc)
 
     return acc.astype(int).sum()/len(acc)
 
@@ -221,18 +201,21 @@ def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, inpu
   # Testing
   model.eval()
   test_loss = 0.0
+  total_acc = 0.0
   with torch.no_grad():
     for images, labels in test_loader:
         images, labels = images.to(device), labels.float().to(device)
         test_loss += criterion(model(images), labels).item()
-        acc = eval_model(images,labels,model)
+        total_acc += eval_model(images, labels, model)
 
-  print("test",acc / len(test_loader)) #debug
+  avg_test_loss = test_loss / len(test_loader)
+  avg_acc = total_acc / len(test_loader)
 
-  return test_loss / len(test_loader) # right now objective function is just the loss (for testing!)
+  print(f"Test Loss: {avg_test_loss:.4f} | Test Acc: {avg_acc:.4f}") #debug
 
-# Penalize infeasible architectures
-# TODO: make penalty proportional to how out of bounds the parameters are instead of a flat 1000
+  return test_loss / len(test_loader)
+
+# Penalize infeasible architectures (penalty is proportional to the distance it goes outside of the search bounds)
 def penalty_function(parameters, search_bounds):
     penalty = 0.0
 
@@ -240,12 +223,12 @@ def penalty_function(parameters, search_bounds):
 
     for parameter, (low, high) in zip(parameter_keys, search_bounds):
         value = parameters[parameter]
-        if not (low <= value < high):
-            penalty += 1000
+        if value < low:
+           penalty += (low - value)
+        elif value > high:
+           penalty += (value - high)
 
-    return penalty
-
-
+    return penalty * 100
 
 def weighted_sums(alpha,beta,complexity,accuracy):
     """take a weighted sum of the accuracy and model size"""
@@ -254,8 +237,16 @@ def weighted_sums(alpha,beta,complexity,accuracy):
 
 # TODO: Make this our multi-objective function instead of just validation loss
 def objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
+  """
+  Returns fitness of a particle based on model accuracy and model complexity. Constraints values to within the search bounds and applies
+  a penalty to particles that go outside of those bounds.
+  """
   penalty = penalty_function(parameters, search_bounds)
-  if penalty > 0:
-    print("Infeasible architecture found!")
-    return penalty
-  return evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, g=generator)
+
+  clipped_parameters = parameters.copy()
+  parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
+  for parameter, (low, high) in zip(parameter_keys, search_bounds):
+     clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
+  
+  fitness = evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, g=generator)
+  return fitness + penalty
