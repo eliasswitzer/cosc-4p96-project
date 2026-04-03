@@ -34,7 +34,7 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
+  def optimize(self, num_iterations, search_bounds, patience, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
@@ -51,9 +51,11 @@ class PSO:
         self.global_best_position = self.particles[i].position.copy()
         self.global_best_fitness = fitness
 
+    no_improvement_count = 0
     # Main PSO Loop
-    for iteration in range(num_iterations): # TODO: add other stopping conditions (particle convergence)
+    for iteration in range(num_iterations):
       print(f"Iteration {iteration + 1}/{num_iterations}")
+      current_best_fitness = self.global_best_fitness
 
       for i in range(len(self.particles)):
         # Update Velocity
@@ -84,6 +86,16 @@ class PSO:
         if particle.best_fitness < self.global_best_fitness:
           self.global_best_fitness = particle.best_fitness
           self.global_best_position = particle.best_position.copy()
+
+      # Early Stopping: Check for fitness stagnation (usually means particles are very close to each other)
+      if (current_best_fitness - self.global_best_fitness) < 1e-4:
+         no_improvement_count += 1
+      else:
+         no_improvement_count = 0
+
+      if no_improvement_count >= patience:
+         print("Particles have converged (fitness stagnation)")
+         break
 
     best_position = self.global_best_position
     return best_position
