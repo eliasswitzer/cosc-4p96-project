@@ -51,12 +51,12 @@ input_dim = int(np.prod(train_dataset[0][0].shape))
 
 search_bounds = [
     (1, 5), # number of hidden layers
-    (16, 1024), # number of nodes per layer
-    (0.00001, 0.1), # learning rate
+    (16, 512), # number of nodes per layer
+    (0.0001, 0.01), # learning rate
     (0.0, 0.99), # momentum
-    (8, 256), # batch size
-    (0.0, 0.1), # weight decay
-    (0.0, 0.7) # dropout rate
+    (16, 256), # batch size
+    (0.0, 0.001), # weight decay
+    (0.0, 0.5) # dropout rate
 ]
 
 #test of multiobjective helper functions - find complexity score of random particle

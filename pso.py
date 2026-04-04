@@ -13,7 +13,7 @@ class Particle:
     self.position = np.array([np.random.uniform(low, high) for low, high in search_bounds]) # initialize position randomly within bounds
     self.velocity = np.zeros(len(search_bounds)) # initialize velocities to zero
 
-    self.best_position = self.position
+    self.best_position = self.position.copy()
     self.best_fitness = float('inf')
 
   def get_network_params(self):
@@ -264,6 +264,6 @@ def objective_function(parameters, search_bounds, train_dataset, val_dataset, te
   parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
   for parameter, (low, high) in zip(parameter_keys, search_bounds):
      clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
-
-  fitness = evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=1, g=generator)
+  
+  fitness = evaluate_particle(clipped_parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, g=generator)
   return fitness + penalty
