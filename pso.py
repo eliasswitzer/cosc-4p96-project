@@ -26,7 +26,7 @@ class Particle:
         'weight_decay': self.position[5],
         'dropout_rate': self.position[6]
     }
-  
+
 class PSO:
   def __init__(self, num_particles, search_bounds, w=0.729, c1=1.49445, c2=1.49445):
     self.particles = [Particle(search_bounds=search_bounds) for _ in range(num_particles)]
@@ -99,7 +99,7 @@ class PSO:
 
     best_position = self.global_best_position
     return best_position
-  
+
   # Define multi objecive functions
   def _get_complexity(self, network_params, train_dataset):
       """#helper function for determining complexity by returning number of params"""
@@ -144,9 +144,6 @@ def eval_model(x_set,y_set,model):
     #sigmoid on each label to get the predictions the model has for each label?
     crit = nn.Sigmoid()
     outputs = crit(model(x_set))
-    # loss = criterion(outputs, y_set)
-    # crit = nn.BCEWithLogitsLoss()
-    # predictions = crit(outputs,y_set)
 
     #conv to numpy and calculate accuracy and loss
     numpy_pred = outputs.cpu().numpy()
@@ -154,10 +151,15 @@ def eval_model(x_set,y_set,model):
 
     numpy_pred = np.where(numpy_pred > 0.5 ,1,0)
 
-    acc = numpy_pred == y_valid_numpy
-    #print("acc",acc)
+    #boolean array of whether the model guessed correctly for each label, for each datapoint
+    correct_labels = numpy_pred == y_valid_numpy
 
-    return acc.astype(int).sum()/len(acc)
+    #this figures out how accurate the models guess for an individual unit was
+    acc_per_unit = correct_labels.astype(int).sum(axis=1)/len(correct_labels[0])
+
+    #average accuracy (of all datapoints
+    acc = acc_per_unit.sum()/len(acc_per_unit)
+    return acc
 
 # evalutate fitness of a particle by training a neural net on the parameters
 def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, g, epochs=5, overfitting_detection = 10):
@@ -218,8 +220,11 @@ def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, inpu
     for images, labels in test_loader:
         images, labels = images.to(device), labels.float().to(device)
         test_loss += criterion(model(images), labels).item()
-        total_acc += eval_model(images, labels, model)
+        curr_acc = eval_model(images, labels, model)
+        total_acc += curr_acc
+        print(curr_acc)
 
+  print(total_acc)
   avg_test_loss = test_loss / len(test_loader)
   avg_acc = total_acc / len(test_loader)
 
@@ -259,6 +264,6 @@ def objective_function(parameters, search_bounds, train_dataset, val_dataset, te
   parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
   for parameter, (low, high) in zip(parameter_keys, search_bounds):
      clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
-  
-  fitness = evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, g=generator)
+
+  fitness = evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=1, g=generator)
   return fitness + penalty
