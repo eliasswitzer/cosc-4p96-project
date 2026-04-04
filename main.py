@@ -18,6 +18,7 @@ parser.add_argument('-c2', metavar='c2', type=float, required=False, default=1.4
 parser.add_argument('-i', '--iterations', metavar='iterations', type=int, required=False, default=10, help="The number of iterations to run the PSO algorithm for")
 parser.add_argument('-np', '--particles', metavar='particles', type=int, required=False, default=10, help="The number of particles to run the PSO algorithm with.")
 parser.add_argument('-p', '--patience', metavar='patience', type=int, required=False, default=5, help="The number of iterations to test for fitness stagation for early stopping.")
+parser.add_argument('-ns', '--neighborhood_size', metavar='neighborhood_size', type=int, required=False, default=3, help="The neighborhood size for local-best PSO algorithm.")
 
 # Datasets
 parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "retina", "blood"], help="The dataset the MLP will be trained on.")
@@ -65,7 +66,7 @@ search_bounds = [
 #print(_get_complexity(pso1.particles[1].get_network_params()))
 
 pso = PSO(num_particles=args.particles, search_bounds=search_bounds, w=args.w, c1=args.c1, c2=args.c2)
-best_position = pso.optimize(args.iterations, search_bounds, args.patience, train_dataset, val_dataset, test_dataset, input_dim, num_classes, g)
+best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, test_dataset, input_dim, num_classes, g)
 
 best = Particle(search_bounds)
 best.position = best_position

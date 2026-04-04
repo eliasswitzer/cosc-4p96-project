@@ -34,7 +34,7 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, patience, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
+  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
@@ -57,13 +57,26 @@ class PSO:
       print(f"Iteration {iteration + 1}/{num_iterations}")
       current_best_fitness = self.global_best_fitness
 
+      # Update velocities using local best
       for i in range(len(self.particles)):
+        # Find neighbor indices of current particle
+        neighbor_indices = [(i + j) % len(self.particles) for j in range(-(neighborhood_size // 2), (neighborhood_size // 2) + 1)] # gets indices surrounding index i using neighborhood size (uses % to handle wrap-around)
+
+        # Find which local particle has the best personal fitness
+        best_neighbor_idx = neighbor_indices[0]
+        best_neighbor_fitness = float('inf')
+        for idx in neighbor_indices:
+           if self.particles[idx].best_fitness < best_neighbor_fitness:
+              best_neighbor_fitness = self.particles[idx].best_fitness
+              best_neighbor_idx = idx
+        local_best_position = self.particles[best_neighbor_idx].best_position
+
         # Update Velocity
         r1 = np.random.rand(len(self.particles[i].position))
         r2 = np.random.rand(len(self.particles[i].position))
 
         cognitive = self.c1 * r1 * (self.particles[i].best_position - self.particles[i].position)
-        social = self.c2 * r2 * (self.global_best_position - self.particles[i].position)
+        social = self.c2 * r2 * (local_best_position - self.particles[i].position) # uses lbest
 
         self.particles[i].velocity = (self.w * self.particles[i].velocity + cognitive + social)
 
@@ -80,21 +93,27 @@ class PSO:
           self.particles[i].best_fitness = fitness
           self.particles[i].best_position = self.particles[i].position.copy()
 
-      # Update Global Best
-      # TODO: Make this local best instead!
+      # Track Global Best (for reporting/final return)
       for particle in self.particles:
         if particle.best_fitness < self.global_best_fitness:
           self.global_best_fitness = particle.best_fitness
           self.global_best_position = particle.best_position.copy()
 
-      # Early Stopping: Check for fitness stagnation (usually means particles are very close to each other)
+      # Early Stopping: Check for fitness stagnation
       if (current_best_fitness - self.global_best_fitness) < 1e-4:
          no_improvement_count += 1
       else:
          no_improvement_count = 0
 
       if no_improvement_count >= patience:
-         print("Particles have converged (fitness stagnation)")
+         print("Fitness improvement has stagnated, stopping early!")
+         break
+      
+      # Early Stopping: Checking particle distance
+      positions = np.array([p.position for p in self.particles])
+      swarm_spread = np.mean(np.std(positions, axis=0))
+      if swarm_spread < 1e-2:
+         print("Swarm has physically converged, stopping early!")
          break
 
     best_position = self.global_best_position
@@ -222,7 +241,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, inpu
         test_loss += criterion(model(images), labels).item()
         curr_acc = eval_model(images, labels, model)
         total_acc += curr_acc
-        print(curr_acc)
+        #print(curr_acc)
 
   print(total_acc)
   avg_test_loss = test_loss / len(test_loader)
