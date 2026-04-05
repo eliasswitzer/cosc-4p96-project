@@ -27,6 +27,9 @@ parser.add_argument('-b', '--beta', metavar='beta', type=float, required=False, 
 # Datasets
 parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "retina", "blood"], help="The dataset the MLP will be trained on.")
 
+# Neural Network Parameters
+parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")
+
 args = parser.parse_args()
 
 print(f"Args: {args}")
@@ -70,7 +73,7 @@ search_bounds = [
 #print(_get_complexity(pso1.particles[1].get_network_params()))
 
 pso = PSO(num_particles=args.particles, search_bounds=search_bounds,elite_init_ratio = 50, w=args.w, c1=args.c1, c2=args.c2)
-best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, g, alpha=args.alpha, beta=args.beta)
+best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
 
 best = Particle(search_bounds)
 best.position = best_position

@@ -26,12 +26,12 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, generator, alpha, beta):
+  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
-      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, generator, alpha, beta)
+      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
       print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -77,7 +77,7 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, generator, alpha, beta)
+        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
         print(f"Particle {i+1} | Test Loss: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
@@ -156,7 +156,7 @@ class PSO:
 
       return penalty * 100
 
-  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, generator, alpha=0.7, beta=0.3):
+  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha=0.7, beta=0.3):
     """
     Returns fitness of a particle based on model evaluation metric and model complexity. Constrains values to within the search bounds and applies
     a penalty to particles that go outside of those bounds.
@@ -169,7 +169,7 @@ class PSO:
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
     # Model Performance
-    performance = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
+    performance = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator)
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
