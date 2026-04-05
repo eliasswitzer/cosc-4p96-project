@@ -5,6 +5,7 @@ import torch
 from torchvision import transforms
 
 from pso import PSO, Particle
+from evaluation import test_model
 
 # Arguments
 parser = argparse.ArgumentParser()
@@ -19,6 +20,7 @@ parser.add_argument('-i', '--iterations', metavar='iterations', type=int, requir
 parser.add_argument('-np', '--particles', metavar='particles', type=int, required=False, default=10, help="The number of particles to run the PSO algorithm with.")
 parser.add_argument('-p', '--patience', metavar='patience', type=int, required=False, default=5, help="The number of iterations to test for fitness stagation for early stopping.")
 parser.add_argument('-ns', '--neighborhood_size', metavar='neighborhood_size', type=int, required=False, default=3, help="The neighborhood size for local-best PSO algorithm.")
+parser.add_argument('-er', '--elite_ratio', metavar='elite_ratio', required=False, default=0, help="The probability of selecting an elite particle for initialization.")
 
 # Objective Function Parameters
 parser.add_argument('-a', '--alpha', metavar='alpha', type=float, required=False, default=0.7, help="The importance of model performance in particle fitness.")
@@ -72,15 +74,13 @@ search_bounds = [
 #print(_complexity_score(pso1.particles[1].get_network_params()))
 #print(_get_complexity(pso1.particles[1].get_network_params()))
 
-pso = PSO(num_particles=args.particles, search_bounds=search_bounds,elite_init_ratio = 50, w=args.w, c1=args.c1, c2=args.c2)
+pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, w=args.w, c1=args.c1, c2=args.c2)
 best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
 
 best = Particle(search_bounds)
 best.position = best_position
+best_parameters = best.get_network_params()
 print("Best architecture found:", best.get_network_params())
 
-#debugging accuracy
-pso2 = PSO(num_particles=1,search_bounds=search_bounds)
-parameters = pso2.particles[0].get_network_params()
-print(parameters)
+final_f1 = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
 

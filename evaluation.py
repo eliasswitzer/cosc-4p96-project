@@ -78,5 +78,45 @@ def f1_score(tp, fp, fn):
   f1 = 2 * (precision * recall) / (precision + recall + epsilon)
   return f1
   
-def test_model(test_dataset):
-  pass
+def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_classes, g):
+  """Trains the best found architecture for more epochs and evaluates on the test set"""
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+  # Initialize the best model
+  model = MLP(input_dim=input_dim, num_classes=num_classes, num_layers=best_parameters['num_hidden_layers'], hidden_size=best_parameters['hidden_layer_size'], dropout_rate=best_parameters['dropout_rate']).to(device)
+
+  epochs = 50
+  optimizer = torch.optim.SGD(model.parameters(), lr=best_parameters['learning_rate'], momentum=best_parameters['momentum'], weight_decay=best_parameters['weight_decay'])
+  criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor([10.0])).to(device)
+
+  train_loader = DataLoader(train_dataset, batch_size=best_parameters['batch_size'], shuffle=True, generator=g)
+  test_loader = DataLoader(test_dataset, batch_size=best_parameters['batch_size'])
+
+  print("Training Final Model on Best Found Parameters")
+
+  for epoch in range(epochs):
+    if epoch % 10 == 0:
+        print(f"Epoch {epoch}/{epochs}")
+    model.train()
+    for images, labels in train_loader:
+      images, labels = images.to(device),  labels.float().to(device)
+      optimizer.zero_grad()
+      loss = criterion(model(images), labels)
+      loss.backward()
+      optimizer.step()
+  
+  model.eval()
+  total_tp, total_fp, total_fn = 0, 0, 0
+  with torch.no_grad():
+    for images, labels in test_loader:
+      images, labels = images.to(device), labels.float().to(device)
+      outputs = model(images)
+      tp, fp, fn = get_batch_metrics(outputs, labels)
+      total_tp += tp
+      total_fp += fp
+      total_fn += fn
+
+  test_f1 = f1_score(total_tp, total_fp, total_fn)
+  print(f"Final Test F1-Score: {test_f1:.4f}")
+  return test_f1
+

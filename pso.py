@@ -4,6 +4,7 @@ import random
 from particle import Particle
 from evaluation import evaluate_particle
 
+# Best architectures to initialize on (need to make sure these are feasible to start with)
 best_architectures = [
     {'num_hidden_layers': 1, 'hidden_layer_size': 507, 'learning_rate': np.float64(0.07007243094258023), 'momentum': np.float64(0.2815590938874142), 'batch_size': 124, 'weight_decay': np.float64(0.003623917664421841), 'dropout_rate': np.float64(0.3520194747252782)}, #f1 .1700
     {'num_hidden_layers': 1, 'hidden_layer_size': 516, 'learning_rate': np.float64(0.06716446772519422), 'momentum': np.float64(0.2768027132848906), 'batch_size': 118, 'weight_decay': np.float64(0.003678189206309699), 'dropout_rate': np.float64(0.35365418395904985)}, #f1 0.1713
@@ -78,7 +79,7 @@ class PSO:
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
         fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
-        print(f"Particle {i+1} | Test Loss: {fitness:.4f} | Parameters: {parameters}")
+        print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
         if fitness < self.particles[i].best_fitness:
