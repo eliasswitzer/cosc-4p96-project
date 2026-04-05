@@ -2,15 +2,26 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import random
 
 from models import MLP
 
+best_architectures = [
+    {'num_hidden_layers': 1, 'hidden_layer_size': 507, 'learning_rate': np.float64(0.07007243094258023), 'momentum': np.float64(0.2815590938874142), 'batch_size': 124, 'weight_decay': np.float64(0.003623917664421841), 'dropout_rate': np.float64(0.3520194747252782)}, #f1 .1700
+    {'num_hidden_layers': 1, 'hidden_layer_size': 516, 'learning_rate': np.float64(0.06716446772519422), 'momentum': np.float64(0.2768027132848906), 'batch_size': 118, 'weight_decay': np.float64(0.003678189206309699), 'dropout_rate': np.float64(0.35365418395904985)}, #f1 0.1713
+    {'num_hidden_layers': 4, 'hidden_layer_size': 633, 'learning_rate': np.float64(0.07217831419000564), 'momentum': np.float64(0.28895730748892684), 'batch_size': 235, 'weight_decay': np.float64(0.0028542421660230945), 'dropout_rate': np.float64(0.3797810576078829)}, #.1712
+    {'num_hidden_layers': 2, 'hidden_layer_size': 494, 'learning_rate': np.float64(0.0720876401520296), 'momentum': np.float64(0.2678506923588762), 'batch_size': 188, 'weight_decay': np.float64(0.003481152724366177), 'dropout_rate': np.float64(0.36792230072978865)}, #.1745
+  ]
+
 class Particle:
-  def __init__(self, search_bounds):
+  def __init__(self, search_bounds,init = None):
     self.search_bounds = search_bounds
     num_dims = len(search_bounds)
 
-    self.position = np.array([np.random.uniform(low, high) for low, high in search_bounds]) # initialize position randomly within bounds
+    if init is None:
+      self.position = np.array([np.random.uniform(low, high) for low, high in search_bounds]) # initialize position randomly within bounds
+    else:
+      self.position = np.array(list(init.values()))
     self.velocity = np.zeros(len(search_bounds)) # initialize velocities to zero
 
     self.best_position = self.position.copy()
@@ -28,8 +39,16 @@ class Particle:
     }
 
 class PSO:
-  def __init__(self, num_particles, search_bounds, w=0.729, c1=1.49445, c2=1.49445):
-    self.particles = [Particle(search_bounds=search_bounds) for _ in range(num_particles)]
+  def __init__(self, num_particles, search_bounds, elite_init_ratio=0, w=0.729, c1=1.49445, c2=1.49445):
+
+    #initialize particles - either randomly or load already good solutions based on elite_init_ratio
+    self.particles =[]
+    for i in range(num_particles):
+        if random.randint(1,100) < elite_init_ratio: # elite particle
+          self.particles.append(Particle(search_bounds=search_bounds,init=random.choice(best_architectures)))
+        else: # random
+          self.particles.append(Particle(search_bounds=search_bounds))
+
     self.global_best_position = None
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
@@ -39,7 +58,7 @@ class PSO:
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
-      fitness = objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator)
+      fitness = objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator)
       print(f"Particle {i+1} | Validation Loss: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -206,7 +225,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, inpu
   model = MLP(input_dim=input_dim, num_classes=num_classes, num_layers=parameters['num_hidden_layers'], hidden_size=parameters['hidden_layer_size'], dropout_rate=parameters['dropout_rate']).to(device)
 
   optimizer = torch.optim.SGD(model.parameters(), lr=parameters['learning_rate'], momentum=parameters['momentum'], weight_decay=parameters['weight_decay'])
-  criterion = nn.BCEWithLogitsLoss(pos_weight= torch.tensor([8])) # BCEWithLogitsLoss is used for multi-class classification problems
+  criterion = nn.BCEWithLogitsLoss(pos_weight= torch.tensor([10])) # BCEWithLogitsLoss is used for multi-class classification problems
 
   running_mean_loss = 0 #stores average loss over minibatches, so this is mean per epoch
   count = 1 #counts minibatches
@@ -257,8 +276,8 @@ def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, inpu
         curr_eval_metric = f1_score(images, labels, model)
         total_eval_metric+= curr_eval_metric
 
-        print(model(images)[0])
-        print(labels[0])
+        # print(model(images)[0])
+        # print(labels[0])
 
   print(total_eval_metric)
   avg_test_loss = test_loss / len(test_loader)
@@ -290,7 +309,7 @@ def weighted_sums(alpha,beta,complexity,eval_metric):
     return (alpha*complexity)+(beta*eval_metric)
 
 # TODO: Make this our multi-objective function instead of just validation loss
-def objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
+def objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
   """
   Returns fitness of a particle based on model evaluation metric and model complexity. Constraints values to within the search bounds and applies
   a penalty to particles that go outside of those bounds.
@@ -302,6 +321,6 @@ def objective_function(parameters, search_bounds, train_dataset, val_dataset, te
   for parameter, (low, high) in zip(parameter_keys, search_bounds):
      clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
-  fitness = evaluate_particle(clipped_parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=5, g=generator)
+  fitness = evaluate_particle(clipped_parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
   return fitness + penalty
 
