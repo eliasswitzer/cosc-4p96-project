@@ -1,10 +1,8 @@
 import numpy as np
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 import random
 
-from models import MLP
+from particle import Particle, evaluate_particle
 
 best_architectures = [
     {'num_hidden_layers': 1, 'hidden_layer_size': 507, 'learning_rate': np.float64(0.07007243094258023), 'momentum': np.float64(0.2815590938874142), 'batch_size': 124, 'weight_decay': np.float64(0.003623917664421841), 'dropout_rate': np.float64(0.3520194747252782)}, #f1 .1700
@@ -12,31 +10,6 @@ best_architectures = [
     {'num_hidden_layers': 4, 'hidden_layer_size': 633, 'learning_rate': np.float64(0.07217831419000564), 'momentum': np.float64(0.28895730748892684), 'batch_size': 235, 'weight_decay': np.float64(0.0028542421660230945), 'dropout_rate': np.float64(0.3797810576078829)}, #.1712
     {'num_hidden_layers': 2, 'hidden_layer_size': 494, 'learning_rate': np.float64(0.0720876401520296), 'momentum': np.float64(0.2678506923588762), 'batch_size': 188, 'weight_decay': np.float64(0.003481152724366177), 'dropout_rate': np.float64(0.36792230072978865)}, #.1745
   ]
-
-class Particle:
-  def __init__(self, search_bounds,init = None):
-    self.search_bounds = search_bounds
-    num_dims = len(search_bounds)
-
-    if init is None:
-      self.position = np.array([np.random.uniform(low, high) for low, high in search_bounds]) # initialize position randomly within bounds
-    else:
-      self.position = np.array(list(init.values()))
-    self.velocity = np.zeros(len(search_bounds)) # initialize velocities to zero
-
-    self.best_position = self.position.copy()
-    self.best_fitness = float('inf')
-
-  def get_network_params(self):
-    return {
-        'num_hidden_layers': int(self.position[0]),
-        'hidden_layer_size': int(self.position[1]),
-        'learning_rate': self.position[2],
-        'momentum': self.position[3],
-        'batch_size': int(self.position[4]),
-        'weight_decay': self.position[5],
-        'dropout_rate': self.position[6]
-    }
 
 class PSO:
   def __init__(self, num_particles, search_bounds, elite_init_ratio=0, w=0.729, c1=1.49445, c2=1.49445):
@@ -53,12 +26,12 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
+  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha, beta):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
-      fitness = objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator)
+      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha, beta)
       print(f"Particle {i+1} | Validation Loss: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -104,7 +77,7 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness = objective_function(parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator)
+        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha, beta)
         print(f"Particle {i+1} | Test Loss: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
@@ -139,188 +112,69 @@ class PSO:
     return best_position
 
   # Define multi objecive functions
-  def _get_complexity(self, network_params, train_dataset):
+  def _get_complexity(self, network_params, input_dim, num_classes):
       """#helper function for determining complexity by returning number of params"""
       """network_params = dict of network parameters (ie. from pso.particles.get_network_params)"""
       #NOTE: this only works if number of layers is consistent across each layer
 
       num_layers = network_params['num_hidden_layers']
       layer_size = network_params['hidden_layer_size']
-      len_input = len(train_dataset)
-      len_output = len(train_dataset.labels[0])
 
-      #middle calculation refers to weights of hidden layers - different when there are 1,2 or 3+ layers
-      middle_calculation = 0
       if num_layers == 1:
-          middle_calculation = layer_size
-      elif num_layers == 2:
-          middle_calculation = layer_size**2
+         middle_weights = 0
       else:
-          middle_calculation = (num_layers-1) * (layer_size**2)
+         middle_weights = (num_layers - 1) * (layer_size  ** 2)
 
       # this = weights on input + weights in hidden layer + weights on output
-      num_weights = ((len_input * layer_size) +
-                      middle_calculation +
-                      (layer_size * len_output))
+      num_weights = (input_dim * layer_size) + middle_weights + (layer_size * num_classes)
 
       # this = biases in hidden layers + biases in output
-      num_biases = ((num_layers * layer_size) +
-                    len_output)
+      num_biases = (num_layers * layer_size) + num_classes
 
-      return (num_weights + num_biases)
+      return num_weights + num_biases
 
-  def _complexity_score(self, network_params):
+  def get_complexity_score(self, network_params, search_bounds, input_dim, num_classes):
       """gets the complexity ranking of the particle by comparing it to the highest possible complexity"""
-      highest_score = self._get_complexity({'num_hidden_layers': 5, 'hidden_layer_size':1024})
-      curr_complexity = self._get_complexity(network_params)
-      return (curr_complexity/highest_score)
+      complexity = self._get_complexity(network_params, input_dim, num_classes)
+      max_layers = int(np.round(search_bounds[0][1]))
+      max_nodes = int(np.round(search_bounds[1][1]))
+      max_params = self._get_complexity({'num_hidden_layers': max_layers, 'hidden_layer_size': max_nodes}, input_dim, num_classes)
+      return complexity / max_params
 
-"""this function gets f1_score with a given dataset and labels"""
-def f1_score(x_set,y_set,model):
-  with torch.no_grad(): #this disables gradient calculations
+  # Penalize infeasible architectures (penalty is proportional to the distance it goes outside of the search bounds)
+  def penalty_function(self, parameters, search_bounds):
+      penalty = 0.0
 
-    #sigmoid on each label to get the predictions the model has for each label?
-    #crit = nn.Sigmoid()
-    outputs = model(x_set)
+      parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
 
-    #conv to numpy
-    numpy_pred = outputs.cpu().numpy()
-    y_valid_numpy = y_set.cpu().numpy()
+      for parameter, (low, high) in zip(parameter_keys, search_bounds):
+          value = parameters[parameter]
+          if value < low:
+            penalty += (low - value)
+          elif value > high:
+            penalty += (value - high)
 
-    numpy_pred = np.where(numpy_pred > 0 ,1,0)
+      return penalty * 100
 
-    #get tp
-    right_guesses = np.where((numpy_pred == y_valid_numpy),1,0) #get all instances where predictions = actual labels
-    tp = np.logical_and(right_guesses,y_valid_numpy) #get the predictions where they guess positive (1) label correct
-    tp = np.sum(tp.astype(int),axis=1)
+  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha=0.7, beta=0.3):
+    """
+    Returns fitness of a particle based on model evaluation metric and model complexity. Constrains values to within the search bounds and applies
+    a penalty to particles that go outside of those bounds.
+    """
+    penalty = self.penalty_function(parameters, search_bounds)
 
-    #get fn
-    tn = np.logical_not(np.logical_or(numpy_pred,y_valid_numpy)) #get pred where neg (0) label was guessed correct. this is where y_pred=0 and labels = 0, so use nor gate
-    tn = np.sum(tn.astype(int),axis=1)
-
-    #false positive - where model guesses positive but its actually negative
-    wrong_guesses = np.logical_xor(numpy_pred,y_valid_numpy).astype(int) #instances where predictions != actual labels (1 =wrong)
-    fp = np.logical_and(wrong_guesses,numpy_pred) #if model guesses wrong (wrong=1) and pred is 1 (positive), means the label is actually 0 (neg). so when both these are 1 we have a fp
-    fp = np.sum(fp.astype(int),axis=1)
-
-    #false negative - model guesses negative but its actually positive
-    fn = np.logical_and(wrong_guesses,np.logical_not(numpy_pred)) #if model is wrong, and pred is negative, label is 1. negate the pred label then and it with wrong_guess, this will be one if fn
-    fn=  np.sum(fn.astype(int),axis=1)
-
-    #do the calculations if denoms aren't 0, or else just set to 0
-    recall = np.where((tp+fn) ==0, 0, tp/(tp+fn))
-    precision = np.where((tp+fp)==0, 0, tp/(tp+fp))
-    f1 = np.where((precision+recall) ==0, 0, 2*(precision*recall)/(precision+recall) )
-
-    return  f1.mean()
-
-# evalutate fitness of a particle by training a neural net on the parameters
-def evaluate_particle(parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, g, epochs=5, overfitting_detection = 10):
-  train_loader = DataLoader(train_dataset, batch_size=parameters['batch_size'], shuffle=True, generator=g)
-  val_loader = DataLoader(val_dataset, batch_size=parameters['batch_size'], generator=g)
-  test_loader = DataLoader(test_dataset, batch_size=parameters['batch_size'], generator=g)
-
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-  model = MLP(input_dim=input_dim, num_classes=num_classes, num_layers=parameters['num_hidden_layers'], hidden_size=parameters['hidden_layer_size'], dropout_rate=parameters['dropout_rate']).to(device)
-
-  optimizer = torch.optim.SGD(model.parameters(), lr=parameters['learning_rate'], momentum=parameters['momentum'], weight_decay=parameters['weight_decay'])
-  criterion = nn.BCEWithLogitsLoss(pos_weight= torch.tensor([10])) # BCEWithLogitsLoss is used for multi-class classification problems
-
-  running_mean_loss = 0 #stores average loss over minibatches, so this is mean per epoch
-  count = 1 #counts minibatches
-  loss_history = np.zeros(overfitting_detection)
-  loss_history[loss_history == 0.0] = np.nan #do this to do mean_nan - ignores nan values, if we use zeros instead it would messup the mean
-
-  # Training
-  model.train()
-  for epoch in range(epochs):
-    print(f"Epoch {epoch+1}/{epochs}")
-    for images, labels in train_loader:
-      images, labels = images.to(device),  labels.float().to(device)
-      optimizer.zero_grad()
-      loss = criterion(model(images), labels)
-      running_mean_loss = running_mean_loss + (loss.item() - running_mean_loss) / count #calculate mean of loss in the batch
-      count += 1
-      loss.backward()
-      optimizer.step()
-
-    # Validation
-    model.eval()
-    val_loss = 0.0
-    with torch.no_grad():
-      for images, labels in val_loader:
-        images, labels = images.to(device), labels.float().to(device)
-        val_loss += criterion(model(images), labels).item()
-
-    val_loss = val_loss / len(val_loader)
-    loss_history[epoch%overfitting_detection] = val_loss
-
-    print("val",val_loss) #debug
-
-    #check overfitting
-    mean = np.nanmean(loss_history)
-    std = np.nanstd(loss_history)
-    if val_loss > mean + std:
-        print(f"Overfitting detected at epoch {epoch}, stopping search early.")
-        break
-
-  # Testing
-  model.eval()
-  test_loss = 0.0
-  total_eval_metric = 0.0
-  with torch.no_grad():
-    for images, labels in test_loader:
-        images, labels = images.to(device), labels.float().to(device)
-        test_loss += criterion(model(images), labels).item()
-        curr_eval_metric = f1_score(images, labels, model)
-        total_eval_metric+= curr_eval_metric
-
-        # print(model(images)[0])
-        # print(labels[0])
-
-  print(total_eval_metric)
-  avg_test_loss = test_loss / len(test_loader)
-  avg_eval_metric = total_eval_metric / len(test_loader)
-
-  print(f"Test Loss: {avg_test_loss:.4f} | Test Evaluation Metric (f1/acc): {avg_eval_metric:.4f}") #debug
-
-
-  return test_loss / len(test_loader)
-
-# Penalize infeasible architectures (penalty is proportional to the distance it goes outside of the search bounds)
-def penalty_function(parameters, search_bounds):
-    penalty = 0.0
-
+    clipped_parameters = parameters.copy()
     parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
-
     for parameter, (low, high) in zip(parameter_keys, search_bounds):
-        value = parameters[parameter]
-        if value < low:
-           penalty += (low - value)
-        elif value > high:
-           penalty += (value - high)
+      clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
-    return penalty * 100
+    # Model Performance
+    performance = evaluate_particle(clipped_parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
 
-def weighted_sums(alpha,beta,complexity,eval_metric):
-    """take a weighted sum of the eval_metric and model size"""
-    """alpha, beta = weights. complexity, eval_metric = individual obj. function values."""
-    return (alpha*complexity)+(beta*eval_metric)
+    # Model Complexity
+    complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
-# TODO: Make this our multi-objective function instead of just validation loss
-def objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator):
-  """
-  Returns fitness of a particle based on model evaluation metric and model complexity. Constraints values to within the search bounds and applies
-  a penalty to particles that go outside of those bounds.
-  """
-  penalty = penalty_function(parameters, search_bounds)
-
-  clipped_parameters = parameters.copy()
-  parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
-  for parameter, (low, high) in zip(parameter_keys, search_bounds):
-     clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
-
-  fitness = evaluate_particle(clipped_parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
-  return fitness + penalty
+    # Maximizing performance, minimizing model complexity
+    fitness = (alpha * (1 - performance)) + (beta * complexity) 
+    return fitness + penalty
 
