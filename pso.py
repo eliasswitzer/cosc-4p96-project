@@ -1,8 +1,8 @@
 import numpy as np
-import torch
 import random
 
-from particle import Particle, evaluate_particle
+from particle import Particle
+from evaluation import evaluate_particle
 
 best_architectures = [
     {'num_hidden_layers': 1, 'hidden_layer_size': 507, 'learning_rate': np.float64(0.07007243094258023), 'momentum': np.float64(0.2815590938874142), 'batch_size': 124, 'weight_decay': np.float64(0.003623917664421841), 'dropout_rate': np.float64(0.3520194747252782)}, #f1 .1700
@@ -26,13 +26,13 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha, beta):
+  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, generator, alpha, beta):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
-      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha, beta)
-      print(f"Particle {i+1} | Validation Loss: {fitness:.4f} | Parameters: {parameters}")
+      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, generator, alpha, beta)
+      print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
       self.particles[i].best_fitness = fitness
@@ -77,7 +77,7 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha, beta)
+        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, generator, alpha, beta)
         print(f"Particle {i+1} | Test Loss: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
@@ -156,7 +156,7 @@ class PSO:
 
       return penalty * 100
 
-  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, test_dataset, input_dim, num_classes, generator, alpha=0.7, beta=0.3):
+  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, generator, alpha=0.7, beta=0.3):
     """
     Returns fitness of a particle based on model evaluation metric and model complexity. Constrains values to within the search bounds and applies
     a penalty to particles that go outside of those bounds.
@@ -169,12 +169,13 @@ class PSO:
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
     # Model Performance
-    performance = evaluate_particle(clipped_parameters, train_dataset, val_dataset, test_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
+    performance = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
     # Maximizing performance, minimizing model complexity
+    print(f"Performance: {performance} | Complexity: {complexity} | Penalty: {penalty}") # debug
     fitness = (alpha * (1 - performance)) + (beta * complexity) 
     return fitness + penalty
 
