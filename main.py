@@ -27,7 +27,7 @@ parser.add_argument('-a', '--alpha', metavar='alpha', type=float, required=False
 parser.add_argument('-b', '--beta', metavar='beta', type=float, required=False, default=0.3, help="The importance of model complexity in particle fitness.")
 
 # Datasets
-parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "retina", "blood"], help="The dataset the MLP will be trained on.")
+parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "blood"], help="The dataset the MLP will be trained on.")
 
 # Neural Network Parameters
 parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")
@@ -42,16 +42,12 @@ torch.manual_seed(args.seed)
 g = torch.Generator().manual_seed(args.seed)
 
 # Load dataset
-from medmnist import ChestMNIST, RetinaMNIST, BloodMNIST
-if args.dataset == 'chest':
+from medmnist import ChestMNIST, BloodMNIST
+if args.dataset == 'chest': # multi-label binary
     train_dataset = ChestMNIST(split='train', transform=transforms.ToTensor(), download=True)
     val_dataset = ChestMNIST(split='val', transform=transforms.ToTensor(), download=True)
     test_dataset = ChestMNIST(split='test', transform=transforms.ToTensor(), download=True)
-elif args.dataset == 'retina':
-    train_dataset = RetinaMNIST(split='train', transform=transforms.ToTensor(), download=True)
-    val_dataset = RetinaMNIST(split='val', transform=transforms.ToTensor(), download=True)
-    test_dataset = RetinaMNIST(split='test', transform=transforms.ToTensor(), download=True)
-else:
+else: # multi-class
     train_dataset = BloodMNIST(split='train', transform=transforms.ToTensor(), download=True)
     val_dataset = BloodMNIST(split='val', transform=transforms.ToTensor(), download=True)
     test_dataset = BloodMNIST(split='test', transform=transforms.ToTensor(), download=True)

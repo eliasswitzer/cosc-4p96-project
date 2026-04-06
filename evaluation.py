@@ -15,6 +15,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
   model = MLP(input_dim=input_dim, num_classes=num_classes, num_layers=parameters['num_hidden_layers'], hidden_size=parameters['hidden_layer_size'], dropout_rate=parameters['dropout_rate']).to(device)
 
   optimizer = torch.optim.SGD(model.parameters(), lr=parameters['learning_rate'], momentum=parameters['momentum'], weight_decay=parameters['weight_decay'])
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
   criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10]).to(device)) # BCEWithLogitsLoss is used for multi-class classification problems
 
   loss_history = np.full(overfitting_detection, np.nan)
@@ -29,6 +30,8 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
       loss = criterion(model(images), labels)
       loss.backward()
       optimizer.step()
+
+    scheduler.step()
 
     # Validation
     model.eval()
@@ -55,7 +58,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
     val_f1 = f1_score(total_tp, total_fp, total_fn)
     ham_loss = ham_loss / len(val_loader)
 
-    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1} Hamming Loss: {ham_loss}")
+    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1} | Hamming Loss: {ham_loss}")
 
     #check overfitting
     if not np.all(np.isnan(loss_history)):
@@ -77,9 +80,10 @@ def get_batch_metrics(outputs, labels):
 
 def hamming_loss(outputs,labels):
   """helper function that calculates hamming distance of labels from the current batch"""
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   preds = (outputs > 0).float()
   #numerator here is hamming distance, divide it by number of labels to get hamming loss
-  return (np.sum(np.logical_xor(preds.numpy(), labels.numpy()),axis=1))/len(labels[0])
+  return (np.sum(np.logical_xor(preds.cpu().numpy(), labels.cpu().numpy()),axis=1))/len(labels[0])
 
 
 def f1_score(tp, fp, fn):
@@ -99,6 +103,7 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
 
   epochs = 50
   optimizer = torch.optim.SGD(model.parameters(), lr=best_parameters['learning_rate'], momentum=best_parameters['momentum'], weight_decay=best_parameters['weight_decay'])
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
   criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor([10.0])).to(device)
 
   train_loader = DataLoader(train_dataset, batch_size=best_parameters['batch_size'], shuffle=True, generator=g)
@@ -116,7 +121,8 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
       loss = criterion(model(images), labels)
       loss.backward()
       optimizer.step()
-
+    scheduler.step()
+  
   model.eval()
   total_tp, total_fp, total_fn = 0, 0, 0
   with torch.no_grad():

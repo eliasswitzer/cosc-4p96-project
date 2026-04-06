@@ -16,6 +16,9 @@ class PSO:
         else: # random
           self.particles.append(Particle(search_bounds=search_bounds))
 
+    self.v_max = np.array([(high - low) * 0.2 for low, high in search_bounds])
+    self.v_min = -self.v_max
+
     self.global_best_position = None
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
@@ -64,7 +67,9 @@ class PSO:
         cognitive = self.c1 * r1 * (self.particles[i].best_position - self.particles[i].position)
         social = self.c2 * r2 * (local_best_position - self.particles[i].position) # uses lbest
 
-        self.particles[i].velocity = (self.w * self.particles[i].velocity + cognitive + social)
+        new_velocity = (self.w * self.particles[i].velocity + cognitive + social)
+
+        self.particles[i].velocity = np.clip(new_velocity, self.v_min, self.v_max) # Apply velocity clamping
 
         # Update Position
         self.particles[i].position = self.particles[i].position + self.particles[i].velocity
@@ -133,7 +138,8 @@ class PSO:
       max_layers = int(np.round(search_bounds[0][1]))
       max_nodes = int(np.round(search_bounds[1][1]))
       max_params = self._get_complexity({'num_hidden_layers': max_layers, 'hidden_layer_size': max_nodes}, input_dim, num_classes)
-      return complexity / max_params
+      # return complexity / max_params
+      return np.log10(complexity) / np.log10(max_params) # adding log here to make penalty less aggressive for larger models
 
   # Penalize infeasible architectures (penalty is proportional to the distance it goes outside of the search bounds)
   def penalty_function(self, parameters, search_bounds):
@@ -163,7 +169,7 @@ class PSO:
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
     # Model Performance
-    f1_score,ham_loss = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
+    f1_score,ham_loss = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator)
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
