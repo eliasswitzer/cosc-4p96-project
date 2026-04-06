@@ -34,6 +34,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
     model.eval()
     val_loss = 0.0
     total_tp, total_fp, total_fn = 0, 0, 0
+    ham_loss = 0.0
 
     with torch.no_grad():
       for images, labels in val_loader:
@@ -45,13 +46,17 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
         total_tp += tp
         total_fp += fp
         total_fn += fn
-        
+
+
+        ham_loss += np.mean(hamming_loss(outputs,labels))
+
     avg_val_loss = val_loss / len(val_loader)
     loss_history[epoch%overfitting_detection] = avg_val_loss
-
     val_f1 = f1_score(total_tp, total_fp, total_fn)
-    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1}")
-    
+    ham_loss = ham_loss / len(val_loader)
+
+    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1} Hamming Loss: {ham_loss}")
+
     #check overfitting
     if not np.all(np.isnan(loss_history)):
         mean = np.nanmean(loss_history)
@@ -60,7 +65,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
             print(f"Overfitting detected at epoch {epoch}, stopping search early.")
             break
 
-  return val_f1
+  return val_f1, ham_loss
 
 def get_batch_metrics(outputs, labels):
   """Helper function to get raw TP, FP, and FN counts from a batch"""
@@ -70,6 +75,13 @@ def get_batch_metrics(outputs, labels):
   fn = torch.sum((preds == 0) & (labels == 1)).item()
   return tp, fp, fn
 
+def hamming_loss(outputs,labels):
+  """helper function that calculates hamming distance of labels from the current batch"""
+  preds = (outputs > 0).float()
+  #numerator here is hamming distance, divide it by number of labels to get hamming loss
+  return (np.sum(np.logical_xor(preds.numpy(), labels.numpy()),axis=1))/len(labels[0])
+
+
 def f1_score(tp, fp, fn):
   """Computes F1-score given number of true positives, false positives, and false negatives"""
   epsilon = 1e-9 # added to prevent division by 0
@@ -77,7 +89,7 @@ def f1_score(tp, fp, fn):
   recall = tp / (tp + fn + epsilon)
   f1 = 2 * (precision * recall) / (precision + recall + epsilon)
   return f1
-  
+
 def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_classes, g):
   """Trains the best found architecture for more epochs and evaluates on the test set"""
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -104,7 +116,7 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
       loss = criterion(model(images), labels)
       loss.backward()
       optimizer.step()
-  
+
   model.eval()
   total_tp, total_fp, total_fn = 0, 0, 0
   with torch.no_grad():

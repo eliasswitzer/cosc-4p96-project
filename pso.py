@@ -3,14 +3,7 @@ import random
 
 from particle import Particle
 from evaluation import evaluate_particle
-
-# Best architectures to initialize on (need to make sure these are feasible to start with)
-best_architectures = [
-    {'num_hidden_layers': 1, 'hidden_layer_size': 507, 'learning_rate': np.float64(0.07007243094258023), 'momentum': np.float64(0.2815590938874142), 'batch_size': 124, 'weight_decay': np.float64(0.003623917664421841), 'dropout_rate': np.float64(0.3520194747252782)}, #f1 .1700
-    {'num_hidden_layers': 1, 'hidden_layer_size': 516, 'learning_rate': np.float64(0.06716446772519422), 'momentum': np.float64(0.2768027132848906), 'batch_size': 118, 'weight_decay': np.float64(0.003678189206309699), 'dropout_rate': np.float64(0.35365418395904985)}, #f1 0.1713
-    {'num_hidden_layers': 4, 'hidden_layer_size': 633, 'learning_rate': np.float64(0.07217831419000564), 'momentum': np.float64(0.28895730748892684), 'batch_size': 235, 'weight_decay': np.float64(0.0028542421660230945), 'dropout_rate': np.float64(0.3797810576078829)}, #.1712
-    {'num_hidden_layers': 2, 'hidden_layer_size': 494, 'learning_rate': np.float64(0.0720876401520296), 'momentum': np.float64(0.2678506923588762), 'batch_size': 188, 'weight_decay': np.float64(0.003481152724366177), 'dropout_rate': np.float64(0.36792230072978865)}, #.1745
-  ]
+from data import best_architectures
 
 class PSO:
   def __init__(self, num_particles, search_bounds, elite_init_ratio=0, w=0.729, c1=1.49445, c2=1.49445):
@@ -170,13 +163,13 @@ class PSO:
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
     # Model Performance
-    performance = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator)
+    f1_score,ham_loss = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=num_iterations, g=generator)
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
     # Maximizing performance, minimizing model complexity
-    print(f"Performance: {performance} | Complexity: {complexity} | Penalty: {penalty}") # debug
-    fitness = (alpha * (1 - performance)) + (beta * complexity) 
+    print(f"Performance: {ham_loss} | Complexity: {complexity} | Penalty: {penalty}") # debug
+    fitness = (alpha * (ham_loss)) + (beta * complexity)
     return fitness + penalty
 
