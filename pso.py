@@ -142,7 +142,9 @@ class PSO:
       max_layers = int(np.round(search_bounds[0][1]))
       max_nodes = int(np.round(search_bounds[1][1]))
       max_params = self._get_complexity({'num_hidden_layers': max_layers, 'hidden_layer_size': max_nodes}, input_dim, num_classes)
-      # return complexity / max_params
+
+
+      #return np.log10(complexity) / np.log10(max_params) # adding log here to make penalty less aggressive for larger models
       return complexity / max_params
 
   # Penalize infeasible architectures (penalty is proportional to the distance it goes outside of the search bounds)
@@ -179,7 +181,7 @@ class PSO:
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
     # Maximizing performance, minimizing model complexity
-    print(f"Performance: {eval_metric2} | Complexity: {complexity} | Penalty: {penalty}") # debug
-    fitness = (alpha * (eval_metric2)) + (beta * complexity)
-    return fitness + penalty
+    print(f"Performance: {eval_metric2} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug
+    fitness = (alpha * (eval_metric2)) + (beta * (1-complexity))
+    return fitness - penalty
 
