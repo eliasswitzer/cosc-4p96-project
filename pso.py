@@ -3,16 +3,20 @@ import random
 
 from particle import Particle
 from evaluation import evaluate_particle
-from data import best_architectures
+
+from data import best_architectures_multiclass, best_architectures_multilabel
 
 class PSO:
-  def __init__(self, num_particles, search_bounds, elite_init_ratio=0, w=0.729, c1=1.49445, c2=1.49445):
+  def __init__(self, num_particles, search_bounds, single_label, elite_init_ratio=0, w=0.729, c1=1.49445, c2=1.49445):
 
     #initialize particles - either randomly or load already good solutions based on elite_init_ratio
     self.particles =[]
     for i in range(num_particles):
         if random.randint(1,100) < elite_init_ratio: # elite particle
-          self.particles.append(Particle(search_bounds=search_bounds,init=random.choice(best_architectures)))
+          if single_label:
+            self.particles.append(Particle(search_bounds=search_bounds,init=random.choice(best_architectures_multiclass)))
+          else:
+            self.particles.append(Particle(search_bounds=search_bounds,init=random.choice(best_architectures_multilabel)))
         else: # random
           self.particles.append(Particle(search_bounds=search_bounds))
 

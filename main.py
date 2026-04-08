@@ -69,8 +69,8 @@ search_bounds = [
 #pso1 = PSO(num_particles=10,search_bounds=search_bounds)
 #print(_complexity_score(pso1.particles[1].get_network_params()))
 #print(_get_complexity(pso1.particles[1].get_network_params()))
-
-pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, w=args.w, c1=args.c1, c2=args.c2)
+single_label = "multi-label" not in (train_dataset.info['task'])
+pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
 best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
 
 best = Particle(search_bounds)

@@ -16,16 +16,27 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
 
   optimizer = torch.optim.SGD(model.parameters(), lr=parameters['learning_rate'], momentum=parameters['momentum'], weight_decay=parameters['weight_decay'])
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-  criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10]).to(device)) # BCEWithLogitsLoss is used for multi-class classification problems
+
+  single_label = "multi-label" not in (train_dataset.info['task']) #true if single label
+
+  # Determine the right loss function for the job
+  if single_label:
+    criterion = nn.CrossEntropyLoss()
+  else:
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10]).to(device)) # BCEWithLogitsLoss is used for multi-class classification problems
 
   loss_history = np.full(overfitting_detection, np.nan)
   val_f1 = 0.0
-
+  evaluation_metrics = [0,0] #storing two of the evaluation metrics
   for epoch in range(epochs):
     # Training
     model.train()
     for images, labels in train_loader:
-      images, labels = images.to(device),  labels.float().to(device)
+
+      if single_label:
+        images, labels = images.to(device), labels.squeeze(1).long().to(device)
+      else:
+        images, labels = images.to(device),  labels.float().to(device) #for multi label
       optimizer.zero_grad()
       loss = criterion(model(images), labels)
       loss.backward()
@@ -38,27 +49,50 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
     val_loss = 0.0
     total_tp, total_fp, total_fn = 0, 0, 0
     ham_loss = 0.0
+    total_acc = 0.0
+    avg_acc = 0.0
 
     with torch.no_grad():
       for images, labels in val_loader:
-        images, labels = images.to(device), labels.float().to(device)
+        if single_label:
+          images, labels = images.to(device), labels.squeeze(1).long().to(device)
+        else:
+          images, labels = images.to(device),  labels.float().to(device) #for multi label
         outputs = model(images)
         val_loss += criterion(model(images), labels).item()
 
-        tp, fp, fn = get_batch_metrics(outputs, labels)
-        total_tp += tp
-        total_fp += fp
-        total_fn += fn
+        #for multi-class
+        if single_label:
+          y_pred = outputs.argmax(1)
+          acc = y_pred == labels
+          total_acc += acc.numpy().astype(int).sum()/len(acc)
 
-
-        ham_loss += np.mean(hamming_loss(outputs,labels))
+        else:
+          tp, fp, fn = get_batch_metrics(outputs, labels)
+          total_tp += tp
+          total_fp += fp
+          total_fn += fn
+          ham_loss += np.mean(hamming_loss(outputs,labels))
 
     avg_val_loss = val_loss / len(val_loader)
-    loss_history[epoch%overfitting_detection] = avg_val_loss
-    val_f1 = f1_score(total_tp, total_fp, total_fn)
-    ham_loss = ham_loss / len(val_loader)
 
-    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1} | Hamming Loss: {ham_loss}")
+    if single_label:
+      avg_acc = total_acc / len(val_loader)
+
+      #when doing multi class we want to return thse
+      evaluation_metrics[0]+=avg_acc
+      evaluation_metrics[1]+=avg_acc #TODO: get f1 score working for this
+
+    else:
+      loss_history[epoch%overfitting_detection] = avg_val_loss
+      val_f1 = f1_score(total_tp, total_fp, total_fn)
+      ham_loss = ham_loss / len(val_loader)
+
+      #when doing multi label we want to return these
+      evaluation_metrics[0]+=val_f1
+      evaluation_metrics[1]+=ham_loss
+
+    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
 
     #check overfitting
     if not np.all(np.isnan(loss_history)):
@@ -68,7 +102,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
             print(f"Overfitting detected at epoch {epoch}, stopping search early.")
             break
 
-  return val_f1, ham_loss
+  return evaluation_metrics[0], evaluation_metrics[1]
 
 def get_batch_metrics(outputs, labels):
   """Helper function to get raw TP, FP, and FN counts from a batch"""
@@ -104,7 +138,14 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   epochs = 50
   optimizer = torch.optim.SGD(model.parameters(), lr=best_parameters['learning_rate'], momentum=best_parameters['momentum'], weight_decay=best_parameters['weight_decay'])
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
-  criterion = nn.BCEWithLogitsLoss(pos_weight = torch.tensor([10.0])).to(device)
+  single_label = "multi-label" not in (test_dataset.info['task']) #true if single label
+
+  # Determine the right loss function for the job
+  if single_label:
+    criterion = nn.CrossEntropyLoss()
+  else:
+    criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([10]).to(device)) # BCEWithLogitsLoss is used for multi-class classification problems
+
 
   train_loader = DataLoader(train_dataset, batch_size=best_parameters['batch_size'], shuffle=True, generator=g)
   test_loader = DataLoader(test_dataset, batch_size=best_parameters['batch_size'])
@@ -116,25 +157,62 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
         print(f"Epoch {epoch}/{epochs}")
     model.train()
     for images, labels in train_loader:
-      images, labels = images.to(device),  labels.float().to(device)
+      if single_label:
+        images, labels = images.to(device), labels.squeeze(1).long().to(device)
+      else:
+        images, labels = images.to(device),  labels.float().to(device) #for multi label
       optimizer.zero_grad()
       loss = criterion(model(images), labels)
       loss.backward()
       optimizer.step()
     scheduler.step()
-  
+
+  # Testing
   model.eval()
   total_tp, total_fp, total_fn = 0, 0, 0
+  ham_loss = 0.0
+  total_acc = 0.0
+  test_f1 =0.0
+  avg_acc = 0.0
   with torch.no_grad():
     for images, labels in test_loader:
-      images, labels = images.to(device), labels.float().to(device)
+      #do the right preprocessing to the labels/images
+      if single_label:
+          images, labels = images.to(device), labels.squeeze(1).long().to(device)
+      else:
+        images, labels = images.to(device),  labels.float().to(device) #for multi label
       outputs = model(images)
-      tp, fp, fn = get_batch_metrics(outputs, labels)
-      total_tp += tp
-      total_fp += fp
-      total_fn += fn
 
-  test_f1 = f1_score(total_tp, total_fp, total_fn)
-  print(f"Final Test F1-Score: {test_f1:.4f}")
-  return test_f1
+      #for multi-class
+      if single_label:
+        y_pred = outputs.argmax(1)
+        acc = y_pred == labels
+        total_acc += acc.numpy().astype(int).sum()/len(acc)
+      else:
+        tp, fp, fn = get_batch_metrics(outputs, labels)
+        total_tp += tp
+        total_fp += fp
+        total_fn += fn
+        ham_loss += np.mean(hamming_loss(outputs,labels))
+
+  evaluation_metrics = [] #append metrics to a list of things to return
+
+  if single_label:
+    avg_acc = total_acc / len(test_loader)
+
+    #when doing multi class we want to return thse
+    evaluation_metrics.append(avg_acc)
+    evaluation_metrics.append(avg_acc) #TODO: get f1 score working for this
+
+  else:
+    test_f1 = f1_score(total_tp, total_fp, total_fn)
+    ham_loss = ham_loss / len(test_loader)
+
+    #when doing multi label we want to return these
+    evaluation_metrics.append(test_f1)
+    evaluation_metrics.append(ham_loss)
+  print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
+
+  print(f"Final Test Evaluation Metrics: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} ")
+  return evaluation_metrics[0], evaluation_metrics[1]
 
