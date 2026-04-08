@@ -143,7 +143,7 @@ class PSO:
       max_nodes = int(np.round(search_bounds[1][1]))
       max_params = self._get_complexity({'num_hidden_layers': max_layers, 'hidden_layer_size': max_nodes}, input_dim, num_classes)
       # return complexity / max_params
-      return np.log10(complexity) / np.log10(max_params) # adding log here to make penalty less aggressive for larger models
+      return complexity / max_params
 
   # Penalize infeasible architectures (penalty is proportional to the distance it goes outside of the search bounds)
   def penalty_function(self, parameters, search_bounds):
@@ -173,13 +173,13 @@ class PSO:
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
     # Model Performance
-    f1_score,ham_loss = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator)
+    eval_metric1,eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
     # Maximizing performance, minimizing model complexity
-    print(f"Performance: {ham_loss} | Complexity: {complexity} | Penalty: {penalty}") # debug
-    fitness = (alpha * (ham_loss)) + (beta * complexity)
+    print(f"Performance: {eval_metric2} | Complexity: {complexity} | Penalty: {penalty}") # debug
+    fitness = (alpha * (eval_metric2)) + (beta * complexity)
     return fitness + penalty
 

@@ -102,7 +102,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
             print(f"Overfitting detected at epoch {epoch}, stopping search early.")
             break
 
-  return evaluation_metrics[0], evaluation_metrics[1]
+  return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
 
 def get_batch_metrics(outputs, labels):
   """Helper function to get raw TP, FP, and FN counts from a batch"""
@@ -214,5 +214,5 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
 
   print(f"Final Test Evaluation Metrics: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} ")
-  return evaluation_metrics[0], evaluation_metrics[1]
+  return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
 
