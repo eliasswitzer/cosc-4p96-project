@@ -13,4 +13,5 @@ best_architectures_multiclass = [
     {'num_hidden_layers': 2, 'hidden_layer_size': 325, 'learning_rate': np.float64(0.004433504616170434), 'momentum': np.float64(0.7775049978766315), 'batch_size': 203, 'weight_decay': np.float64(0.0002725926052826416), 'dropout_rate': np.float64(0.13823212757154835)},
     {'num_hidden_layers': 3, 'hidden_layer_size': 343, 'learning_rate': np.float64(0.0064135046161704345), 'momentum': np.float64(0.5795049978766316), 'batch_size': 155, 'weight_decay': np.float64(0.0004725926052826416), 'dropout_rate': np.float64(0.23823212757154835)}, #0.8618
     {'num_hidden_layers': 3, 'hidden_layer_size': 382, 'learning_rate': np.float64(0.008393504616170435), 'momentum': np.float64(0.38150499787663156), 'batch_size': 120, 'weight_decay': np.float64(0.0006725926052826416), 'dropout_rate': np.float64(0.33823212757154836)}, #.839
+    {'num_hidden_layers': 2, 'hidden_layer_size': 289, 'learning_rate': np.float64(0.0023122658283643445), 'momentum': np.float64(0.998799028991683), 'batch_size': 264, 'weight_decay': np.float64(0.00025458847802880657), 'dropout_rate': np.float64(0.06607778747665126)} #.849 - (.75testing), 0.66 complex
 ]

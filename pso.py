@@ -182,6 +182,7 @@ class PSO:
 
     # Maximizing performance, minimizing model complexity
     print(f"Performance: {eval_metric2} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug
-    fitness = (alpha * (eval_metric2)) + (beta * (1-complexity))
-    return fitness - penalty
+    fitness = (alpha * (eval_metric2)) + (beta * (1-complexity)) # standard multi objective
+
+    return 1/(fitness - penalty) #GET RID OF THIS AND REPLACE WITH DENOM
 
