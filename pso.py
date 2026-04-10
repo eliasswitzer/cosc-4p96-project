@@ -167,7 +167,6 @@ class PSO:
     Returns fitness of a particle based on model evaluation metric and model complexity. Constrains values to within the search bounds and applies
     a penalty to particles that go outside of those bounds.
     """
-    penalty = self.penalty_function(parameters, search_bounds)
 
     clipped_parameters = parameters.copy()
     parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
@@ -180,9 +179,16 @@ class PSO:
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
-    # Maximizing performance, minimizing model complexity
-    print(f"Performance: {eval_metric2} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug
+    # Maximizing performance, minimizing model complexity - invert complexity so compplexity close to 1 -> better
     fitness = (alpha * (eval_metric2)) + (beta * (1-complexity)) # standard multi objective
 
-    return 1/(fitness - penalty) #GET RID OF THIS AND REPLACE WITH DENOM
+    #get penalty
+    penalty = self.penalty_function(parameters, search_bounds)
+    penalty = min((penalty * 100) / (fitness * 100),1) * fitness #scales this so penalty takes a percentage out of fitness based on how large it is
+
+    print(f"Performance: {eval_metric2} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug
+
+
+    if(fitness == penalty): return 0 #avoid division by zero
+    return 1/(fitness - penalty) #TODO GET RID OF THIS WHEN PSO GETS CHANGED - INVERT IT SO BEST FITNESS IS SMALLEST SO PSO PICKS IT
 
