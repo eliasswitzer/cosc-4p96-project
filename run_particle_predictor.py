@@ -2,14 +2,14 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from models import ParticlePredictor
-from data import training_data
+from data import training_data,testing_data
 
 """This class contains the particle predictor"""
 """it uses stored particle representations with validation accuracy to train a simple ANN with"""
 
 #some parameters
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-EPOCHS = 500
+EPOCHS = 300
 
 #define some nn stuff
 model = ParticlePredictor().to(DEVICE)
@@ -56,9 +56,30 @@ for epoch in range(EPOCHS):
     if(epoch==0 or epoch%100==0):
         print(f"Average Loss: {avg_loss/len(dataloader)}")
 
+#grab and format imported testing data
+test_set = np.array(list(testing_data[0][0].values())) #do one pass manually to initialize variables
+test_labels = np.array(testing_data[0][1])
+for i in range(1,len(testing_data)): #append everything in a 1d array
+    test_set = np.append(test_set, np.array(list(testing_data[i][0].values())))
+    test_labels = np.append(test_labels, np.array(testing_data[i][1]))
+
+#more manipulations
+test_set = test_set.reshape(len(testing_data),7) #reformat
+test_set  = (test_set - test_set.mean(axis=0))/test_set.std(axis=0)#zscore normalize
+
+#create tensors
+test_labels_tensor = torch.tensor(test_labels.reshape(-1,1), dtype=torch.float32)
+test_set_tensor = torch.tensor(test_set, dtype=torch.float32)
+
 # debug: print out some of the labels
-for x, y in DataLoader(dataset, batch_size=20):
+model.eval()
+avg_loss = 0
+last_outputs = 0
+for x, y in DataLoader(TensorDataset(test_set_tensor,test_labels_tensor), batch_size=20):
     x, y = x.to(DEVICE), y.to(DEVICE)
     outputs = model(x)
-    print(outputs)
-    break
+    loss = criterion(model(x), y)
+    avg_loss +=loss.item()
+    last_outputs = outputs
+print(avg_loss/10)
+print(last_outputs)
