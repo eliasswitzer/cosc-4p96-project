@@ -214,5 +214,56 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
 
   print(f"Final Test Evaluation Metrics: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} ")
+  print(evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs)
   return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
 
+
+
+
+
+# a simplier version of the evaluate particle function for convienently collecting data about particles for training the predictor
+def collect_particle_data(best_parameters, train_dataset, test_dataset, input_dim, num_classes, g):
+  """Trains the best found architecture for more epochs and evaluates on the test set"""
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+  # Initialize the best model
+  model = MLP(input_dim=input_dim, num_classes=num_classes, num_layers=best_parameters['num_hidden_layers'], hidden_size=best_parameters['hidden_layer_size'], dropout_rate=best_parameters['dropout_rate']).to(device)
+
+  epochs = 10
+  optimizer = torch.optim.SGD(model.parameters(), lr=best_parameters['learning_rate'], momentum=best_parameters['momentum'], weight_decay=best_parameters['weight_decay'])
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+  criterion = nn.CrossEntropyLoss()
+
+  train_loader = DataLoader(train_dataset, batch_size=best_parameters['batch_size'], shuffle=True, generator=g)
+  test_loader = DataLoader(test_dataset, batch_size=best_parameters['batch_size'])
+
+  for epoch in range(epochs):
+    model.train()
+    for images, labels in train_loader:
+      images, labels = images.to(device), labels.squeeze(1).to(device)
+
+      optimizer.zero_grad()
+      loss = criterion(model(images), labels)
+      loss.backward()
+      optimizer.step()
+    scheduler.step()
+
+  # Testing
+  model.eval()
+  total_acc = 0.0
+  avg_acc = 0.0
+
+  with torch.no_grad():
+    for images, labels in test_loader:
+      images, labels = images.to(device), labels.squeeze(1).to(device)
+
+      outputs = model(images)
+      y_pred = outputs.argmax(1)
+
+      acc = y_pred == labels
+      total_acc += acc.numpy().astype(int).sum()/len(acc)
+
+  avg_acc = total_acc / len(test_loader)
+
+  #prints in a format easy to copy paste
+  print(f"[{best_parameters},{avg_acc:.4f}],")
