@@ -33,8 +33,9 @@ parser.add_argument('--dataset', metavar='dataset', type=str, required=False, de
 # Neural Network Parameters
 parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")
 
-# Visualization
+# Main Components
 parser.add_argument('--visualize', action='store_true', help="If included, displays all visualizations.")
+parser.add_argument('--final_test', action='store_true', help="If included, trains the best found architecture for 50 epochs and tests it on the test data.")
 
 args = parser.parse_args()
 
@@ -85,5 +86,6 @@ best.position = best_position
 best_parameters = best.get_network_params()
 print("Best architecture found:", best.get_network_params())
 
-final_f1 = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
+if args.final_test: 
+    final_f1 = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
 

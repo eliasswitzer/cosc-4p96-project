@@ -35,10 +35,12 @@ def plot_distribution(history):
     plt.show()
 
 def plot_pareto(history):
-    points = np.array(history['pareto_data'])
+    points = np.array(history['pareto_data'][-1])
     plt.figure(figsize=(8, 6))
     plt.scatter(points[:, 1], points[:, 0])
     plt.xlabel("Complexity")
     plt.ylabel("Performance")
     plt.grid(True)
     plt.show()
+
+    # maybe add a version that shows the progression of the front by iteration

@@ -57,6 +57,7 @@ class PSO:
     for iteration in range(num_iterations):
       print(f"Iteration {iteration + 1}/{num_iterations}")
       current_best_fitness = self.global_best_fitness
+      iteration_pareto = []
 
       # Update velocities using local best
       for i in range(len(self.particles)):
@@ -88,7 +89,8 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness, _, _ = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
+        fitness, performance, complexity = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
+        iteration_pareto.append((performance, complexity))
         print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
@@ -111,6 +113,8 @@ class PSO:
       swarm_spread = np.mean(np.std(positions, axis=0))
       history['diversity'].append(swarm_spread)
 
+      history['pareto_data'].append(iteration_pareto)
+
       # Early Stopping: Check for fitness stagnation
       if (current_best_fitness - self.global_best_fitness) < 1e-4:
          no_improvement_count += 1
@@ -125,11 +129,6 @@ class PSO:
       if swarm_spread < 1e-2:
          print("Swarm has physically converged, stopping early!")
          break
-      
-    # Add Pareto front data to history
-    for p in self.particles:
-       _, performance, complexity = self.objective_function(num_iterations, p.get_network_params(), search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
-       history['pareto_data'].append((performance, complexity))
 
     best_position = self.global_best_position
     return best_position, history
