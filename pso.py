@@ -48,6 +48,7 @@ class PSO:
       parameters = self.particles[i].get_network_params()
 
       fitness, _, _ = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
+      #continue
       print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -233,7 +234,10 @@ class PSO:
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
     # Maximizing performance, minimizing model complexity - invert complexity so compplexity close to 1 -> better
-    fitness = (alpha * (1-performance)) + (beta * (1-complexity)) # standard multi objective
+    if "multi-label" not in (train_dataset.info['task']):
+      fitness = (alpha * (performance)) + (beta * (1-complexity)) # standard multi objective
+    else:
+      fitness = (alpha * (1-performance)) + (beta * (1-complexity)) # standard multi objective
 
     #get penalty
     penalty = self.penalty_function(parameters, search_bounds)

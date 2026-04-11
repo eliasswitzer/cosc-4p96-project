@@ -25,11 +25,11 @@ class ParticlePredictor(nn.Module):
     super().__init__()
     self.flatten = nn.Flatten()
     self.linear_relu_stack = nn.Sequential(
-        nn.Linear(7,64),
+        nn.Linear(7,40),
         nn.LeakyReLU(0.1),
-        nn.Linear(64,8),
+        nn.Linear(40,10),
         nn.LeakyReLU(0.1),
-        nn.Linear(8,1),
+        nn.Linear(10,1),
 
     )
   def forward(self,x):

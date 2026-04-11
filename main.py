@@ -81,7 +81,7 @@ if not single_label and args.use_predictor == True:
 
 
 pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
-best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
+best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
 
 if args.visualize:
     plot_fitness(history)
