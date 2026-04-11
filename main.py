@@ -6,6 +6,7 @@ from torchvision import transforms
 
 from pso import PSO, Particle
 from evaluation import test_model
+from visualizations import plot_fitness, plot_distribution, plot_diversity, plot_pareto
 
 # Arguments
 parser = argparse.ArgumentParser()
@@ -31,6 +32,9 @@ parser.add_argument('--dataset', metavar='dataset', type=str, required=False, de
 
 # Neural Network Parameters
 parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")
+
+# Visualization
+parser.add_argument('--visualize', action='store_true', help="If included, displays all visualizations.")
 
 args = parser.parse_args()
 
@@ -68,7 +72,13 @@ search_bounds = [
 
 single_label = "multi-label" not in (train_dataset.info['task'])
 pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
-best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
+best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
+
+if args.visualize:
+    plot_fitness(history)
+    plot_diversity(history)
+    plot_distribution(history)
+    plot_pareto(history)
 
 best = Particle(search_bounds)
 best.position = best_position
