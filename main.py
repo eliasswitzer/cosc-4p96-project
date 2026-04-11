@@ -6,6 +6,7 @@ from torchvision import transforms
 
 from pso import PSO, Particle
 from evaluation import test_model
+from visualizations import plot_fitness, plot_distribution, plot_diversity, plot_pareto
 
 # Arguments
 parser = argparse.ArgumentParser()
@@ -34,6 +35,10 @@ parser.add_argument('-pred','--use_predictor', metavar = 'use_predictor', type =
 
 # Neural Network Parameters
 parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")
+
+# Main Components
+parser.add_argument('--visualize', action='store_true', help="If included, displays all visualizations.")
+parser.add_argument('--final_test', action='store_true', help="If included, trains the best found architecture for 50 epochs and tests it on the test data.")
 
 args = parser.parse_args()
 
@@ -76,12 +81,19 @@ if not single_label and args.use_predictor == True:
 
 
 pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
-best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
+best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
+
+if args.visualize:
+    plot_fitness(history)
+    plot_diversity(history)
+    plot_distribution(history)
+    plot_pareto(history)
 
 best = Particle(search_bounds)
 best.position = best_position
 best_parameters = best.get_network_params()
 print("Best architecture found:", best.get_network_params())
 
-final_f1 = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
+if args.final_test:
+    final_f1 = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
 

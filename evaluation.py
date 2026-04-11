@@ -217,10 +217,6 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   print(evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs)
   return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
 
-
-
-
-
 # a simplier version of the evaluate particle function for convienently collecting data about particles for training the predictor
 def collect_particle_data(best_parameters, train_dataset, test_dataset, input_dim, num_classes, g):
   """Trains the best found architecture for more epochs and evaluates on the test set"""

@@ -28,10 +28,18 @@ class PSO:
     self.v_min = -self.v_max
 
     self.global_best_position = None
-    self.global_best_fitness = float('inf')
+    self.global_best_fitness = -float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor = False):
+  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor=False):
+    history = { # store metrics for visualization
+       'best_fitness': [],
+       'avg_fitness': [],
+       'diversity': [],
+       'architectures': [],
+       'pareto_data': []
+    }
+
     # Evaluate initial population
     print(f"Evaluating Initial Population")
     print("USE PREDICTOR",use_predictor)
@@ -39,7 +47,7 @@ class PSO:
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
 
-      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
+      fitness, _, _ = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
       print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -47,7 +55,7 @@ class PSO:
       self.particles[i].best_position = self.particles[i].position.copy()
 
       # Set Initial Global Best
-      if fitness < self.global_best_fitness:
+      if fitness > self.global_best_fitness:
         self.global_best_position = self.particles[i].position.copy()
         self.global_best_fitness = fitness
 
@@ -56,6 +64,7 @@ class PSO:
     for iteration in range(num_iterations):
       print(f"Iteration {iteration + 1}/{num_iterations}")
       current_best_fitness = self.global_best_fitness
+      iteration_pareto = []
 
       # Update velocities using local best
       for i in range(len(self.particles)):
@@ -64,9 +73,9 @@ class PSO:
 
         # Find which local particle has the best personal fitness
         best_neighbor_idx = neighbor_indices[0]
-        best_neighbor_fitness = float('inf')
+        best_neighbor_fitness = -float('inf')
         for idx in neighbor_indices:
-           if self.particles[idx].best_fitness < best_neighbor_fitness:
+           if self.particles[idx].best_fitness > best_neighbor_fitness:
               best_neighbor_fitness = self.particles[idx].best_fitness
               best_neighbor_idx = idx
         local_best_position = self.particles[best_neighbor_idx].best_position
@@ -87,20 +96,42 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
+        fitness, performance, complexity = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
+        iteration_pareto.append((performance, complexity))
         print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
-        if fitness < self.particles[i].best_fitness:
+        if fitness > self.particles[i].best_fitness:
           self.particles[i].best_fitness = fitness
           self.particles[i].best_position = self.particles[i].position.copy()
 
       # Track Global Best (for reporting/final return)
       for particle in self.particles:
-        if particle.best_fitness < self.global_best_fitness:
+        if particle.best_fitness > self.global_best_fitness:
           self.global_best_fitness = particle.best_fitness
           self.global_best_position = particle.best_position.copy()
-          print("new best fitness: ", particle.best_fitness)
+
+      # Add to metrics history
+      history['best_fitness'].append(self.global_best_fitness)
+      history['avg_fitness'].append(np.mean([p.best_fitness for p in self.particles]))
+      history['architectures'] = [p.get_network_params() for p in self.particles]
+
+      positions = np.array([p.position for p in self.particles])
+      swarm_spread = np.mean(np.std(positions, axis=0))
+      history['diversity'].append(swarm_spread)
+
+      history['pareto_data'].append(iteration_pareto)
+
+      # Add to metrics history
+      history['best_fitness'].append(self.global_best_fitness)
+      history['avg_fitness'].append(np.mean([p.best_fitness for p in self.particles]))
+      history['architectures'] = [p.get_network_params() for p in self.particles]
+
+      positions = np.array([p.position for p in self.particles])
+      swarm_spread = np.mean(np.std(positions, axis=0))
+      history['diversity'].append(swarm_spread)
+
+      history['pareto_data'].append(iteration_pareto)
 
       # Early Stopping: Check for fitness stagnation
       if (current_best_fitness - self.global_best_fitness) < 1e-4:
@@ -113,14 +144,12 @@ class PSO:
          break
 
       # Early Stopping: Checking particle distance
-      positions = np.array([p.position for p in self.particles])
-      swarm_spread = np.mean(np.std(positions, axis=0))
       if swarm_spread < 1e-2:
          print("Swarm has physically converged, stopping early!")
          break
 
     best_position = self.global_best_position
-    return best_position
+    return best_position, history
 
   # Define multi objecive functions
   def _get_complexity(self, network_params, input_dim, num_classes):
@@ -197,21 +226,26 @@ class PSO:
           eval_metric1 = eval_metric2 = pp(x).item()
           print(eval_metric1)
     else:
-      eval_metric1,eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
+      eval_metric1, eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
+    performance = eval_metric2
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
 
     # Maximizing performance, minimizing model complexity - invert complexity so compplexity close to 1 -> better
-    fitness = (alpha * (eval_metric2)) + (beta * (1-complexity)) # standard multi objective
+    fitness = (alpha * (1-performance)) + (beta * (1-complexity)) # standard multi objective
 
     #get penalty
     penalty = self.penalty_function(parameters, search_bounds)
-    penalty = min((penalty * 100) / (fitness * 100),1) * fitness #scales this so penalty takes a percentage out of fitness based on how large it is
+    if fitness <= 0:
+       fitness_adjusted = 0.0
+    else:
+       penalty = min(penalty / fitness, 1.0) * fitness #scales this so penalty takes a percentage out of fitness based on how large it is
+       fitness_adjusted = fitness - penalty
 
-    print(f"Performance: {eval_metric2} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug
+    print(f"Performance: {performance} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug=
 
-
-    if(fitness == penalty): return 10 #avoid division by zero #TODO this should return zero
-    return 1/(fitness - penalty) #TODO GET RID OF THIS WHEN PSO GETS CHANGED - INVERT IT SO BEST FITNESS IS SMALLEST SO PSO PICKS IT
+    if "multi-label" not in (train_dataset.info['task']):
+       return fitness_adjusted, performance, 1-complexity # return full fitness value (and sub-values for Pareto visualization)
+    return fitness_adjusted, 1-performance, 1-complexity # return full fitness value (and sub-values for Pareto visualization)
 
