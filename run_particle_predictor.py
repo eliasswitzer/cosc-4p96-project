@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from models import ParticlePredictor
 from data import training_data,testing_data
+from random import randint
 
 """This class contains the particle predictor"""
 """it uses stored particle representations with validation accuracy to train a simple ANN with"""
@@ -11,20 +12,33 @@ from data import training_data,testing_data
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 EPOCHS = 300
 
+#custom loss function
+def my_loss(output, target):
+    SE = (output - target)**2
+    SE = torch.where((target<=.8) ,SE*1.2,SE)
+    SE= torch.where((target<=.7) ,SE*1.4,SE) #these should compound
+    SE= torch.where((target<=.6) ,SE*1.6,SE)
+    SE= torch.where((target<=.5) ,SE*1.8,SE)
+
+    return torch.mean(SE)
+
 #define some nn stuff
 model = ParticlePredictor().to(DEVICE)
-criterion = torch.nn.MSELoss()
+criterion = torch.nn.MSELoss() #my_loss
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 #grab and format imported training data
+num_data = 1
 train_set = np.array(list(training_data[0][0].values())) #do one pass manually to initialize variables
 train_labels = np.array(training_data[0][1])
 for i in range(1,len(training_data)): #append everything in a 1d array
-    train_set = np.append(train_set, np.array(list(training_data[i][0].values())))
-    train_labels = np.append(train_labels, np.array(training_data[i][1]))
+    #if training_data[i][1] <= 0.8 or randint(0,1) ==0: #50% chance to accept data over 80%
+        num_data+=1
+        train_set = np.append(train_set, np.array(list(training_data[i][0].values())))
+        train_labels = np.append(train_labels, np.array(training_data[i][1]))
 
 #more manipulations
-train_set = train_set.reshape(len(training_data),7) #reformat
+train_set = train_set.reshape(num_data,7) #reformat
 train_set  = (train_set - train_set.mean(axis=0))/train_set.std(axis=0)#zscore normalize
 
 #create tensors
