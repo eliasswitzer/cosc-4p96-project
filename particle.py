@@ -12,7 +12,7 @@ class Particle:
     self.velocity = np.zeros(len(search_bounds)) # initialize velocities to zero
 
     self.best_position = self.position.copy()
-    self.best_fitness = float('inf')
+    self.best_fitness = -float('inf')
 
   def get_network_params(self):
     return {

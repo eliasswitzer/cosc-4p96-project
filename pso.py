@@ -40,7 +40,7 @@ class PSO:
       self.particles[i].best_position = self.particles[i].position.copy()
 
       # Set Initial Global Best
-      if fitness < self.global_best_fitness:
+      if fitness > self.global_best_fitness:
         self.global_best_position = self.particles[i].position.copy()
         self.global_best_fitness = fitness
 
@@ -59,7 +59,7 @@ class PSO:
         best_neighbor_idx = neighbor_indices[0]
         best_neighbor_fitness = float('inf')
         for idx in neighbor_indices:
-           if self.particles[idx].best_fitness < best_neighbor_fitness:
+           if self.particles[idx].best_fitness > best_neighbor_fitness:
               best_neighbor_fitness = self.particles[idx].best_fitness
               best_neighbor_idx = idx
         local_best_position = self.particles[best_neighbor_idx].best_position
@@ -84,13 +84,13 @@ class PSO:
         print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
-        if fitness < self.particles[i].best_fitness:
+        if fitness > self.particles[i].best_fitness:
           self.particles[i].best_fitness = fitness
           self.particles[i].best_position = self.particles[i].position.copy()
 
       # Track Global Best (for reporting/final return)
       for particle in self.particles:
-        if particle.best_fitness < self.global_best_fitness:
+        if particle.best_fitness > self.global_best_fitness:
           self.global_best_fitness = particle.best_fitness
           self.global_best_position = particle.best_position.copy()
 
@@ -190,5 +190,5 @@ class PSO:
 
 
     if(fitness == penalty): return 0 #avoid division by zero
-    return 1/(fitness - penalty) #TODO GET RID OF THIS WHEN PSO GETS CHANGED - INVERT IT SO BEST FITNESS IS SMALLEST SO PSO PICKS IT
+    return fitness - penalty
 
