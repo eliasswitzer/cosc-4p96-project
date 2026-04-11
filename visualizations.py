@@ -35,12 +35,34 @@ def plot_distribution(history):
     plt.show()
 
 def plot_pareto(history):
-    points = np.array(history['pareto_data'][-1])
+    points = np.array(history['pareto_data'][-1]) # get points from final iteration
+
+    pareto = []
+    for i, (p_i, c_i) in enumerate(points):
+        dominated = False
+        for j, (p_j , c_j) in enumerate(points):
+            if i == j:
+                continue
+            if (p_j <= p_i and c_j <= c_i) and (p_j < p_i or c_j < c_i):
+                dominated = True
+                break
+        if not dominated:
+            pareto.append((p_i, c_i))
+    
+    pareto = np.array(pareto)
+
+    if len(pareto) > 0:
+        pareto = pareto[np.argsort(pareto[:, 1])]
+
     plt.figure(figsize=(8, 6))
-    plt.scatter(points[:, 1], points[:, 0])
+    plt.scatter(points[:, 1], points[:, 0], alpha=0.3, label="All Solutions")
+
+    if len(pareto) > 0:
+        plt.scatter(pareto[:, 1], pareto[:, 0], color='red', label="Pareto Front")
+
     plt.xlabel("Complexity")
     plt.ylabel("Performance")
+    plt.title("Pareto Front (Non-Dominated Solutions)")
+    plt.legend()
     plt.grid(True)
     plt.show()
-
-    # maybe add a version that shows the progression of the front by iteration
