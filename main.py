@@ -28,7 +28,7 @@ parser.add_argument('-a', '--alpha', metavar='alpha', type=float, required=False
 parser.add_argument('-b', '--beta', metavar='beta', type=float, required=False, default=0.3, help="The importance of model complexity in particle fitness.")
 
 # Datasets
-parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "blood"], help="The dataset the MLP will be trained on.")
+parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="blood", choices=["chest", "blood"], help="The dataset the MLP will be trained on.")
 
 # Enable Particle Predictor
 parser.add_argument('-pred','--use_predictor', metavar = 'use_predictor', type = bool, required = False, default =False, help = "Enable the particle predictor to significantly speed up particle evaluation at the expense of some accuracy (MULTI-CLASS ONLY)." )
@@ -95,5 +95,5 @@ best_parameters = best.get_network_params()
 print("Best architecture found:", best.get_network_params())
 
 if args.final_test:
-    final_f1 = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
+    final_f1, _ = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
 

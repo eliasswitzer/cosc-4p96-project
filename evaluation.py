@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from sklearn.metrics import roc_auc_score
 
 from models import MLP
 
@@ -174,14 +175,29 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   total_acc = 0.0
   test_f1 =0.0
   avg_acc = 0.0
+  test_auc = 0.0
+
+  all_probs = []
+  all_targets = []
+
   with torch.no_grad():
     for images, labels in test_loader:
       #do the right preprocessing to the labels/images
       if single_label:
-          images, labels = images.to(device), labels.squeeze(1).long().to(device)
+        images, labels = images.to(device), labels.squeeze(1).long().to(device)
       else:
         images, labels = images.to(device),  labels.float().to(device) #for multi label
       outputs = model(images)
+
+      # store predictions for AUC
+      if single_label:
+        probs = torch.softmax(outputs, dim=1)
+        all_probs.append(probs.cpu().numpy())
+        all_targets.append(labels.cpu().numpy())
+      else:
+        probs = torch.sigmoid(outputs)
+        all_probs.append(probs.cpu().numpy())
+        all_targets.append(labels.cpu().numpy())
 
       #for multi-class
       if single_label:
@@ -197,8 +213,17 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
 
   evaluation_metrics = [] #append metrics to a list of things to return
 
+  # Format for AUC calculation
+  all_probs = np.vstack(all_probs)
+  all_targets = np.concatenate(all_targets) if single_label else np.vstack(all_targets)
+
   if single_label:
     avg_acc = total_acc / len(test_loader)
+
+    try:
+      test_auc = roc_auc_score(all_targets, all_probs, multi_class='ovr')
+    except ValueError:
+      test_auc = 0.0
 
     #when doing multi class we want to return thse
     evaluation_metrics.append(avg_acc)
@@ -208,12 +233,17 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
     test_f1 = f1_score(total_tp, total_fp, total_fn)
     ham_loss = ham_loss / len(test_loader)
 
+    try:
+      test_auc = roc_auc_score(all_targets, all_probs, average='macro')
+    except ValueError:
+      test_auc = 0.0
+
     #when doing multi label we want to return these
     evaluation_metrics.append(test_f1)
     evaluation_metrics.append(ham_loss)
   print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
 
-  print(f"Final Test Evaluation Metrics: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} ")
+  print(f"Final Test Evaluation Metrics: F1: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} | {test_auc:.4f} ")
   print(evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs)
   return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
 
