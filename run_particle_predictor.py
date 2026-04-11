@@ -71,6 +71,9 @@ test_set  = (test_set - test_set.mean(axis=0))/test_set.std(axis=0)#zscore norma
 test_labels_tensor = torch.tensor(test_labels.reshape(-1,1), dtype=torch.float32)
 test_set_tensor = torch.tensor(test_set, dtype=torch.float32)
 
+#save model
+torch.save(model.state_dict(),"model")
+
 # debug: print out some of the labels
 model.eval()
 avg_loss = 0

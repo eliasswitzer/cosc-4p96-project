@@ -29,6 +29,9 @@ parser.add_argument('-b', '--beta', metavar='beta', type=float, required=False, 
 # Datasets
 parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="chest", choices=["chest", "blood"], help="The dataset the MLP will be trained on.")
 
+# Enable Particle Predictor
+parser.add_argument('-pred','--use_predictor', metavar = 'use_predictor', type = bool, required = False, default =False, help = "Enable the particle predictor to significantly speed up particle evaluation at the expense of some accuracy (MULTI-CLASS ONLY)." )
+
 # Neural Network Parameters
 parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")
 
@@ -65,10 +68,15 @@ search_bounds = [
     (0.0, 0.5) # dropout rate
 ]
 
-
+#do some input checking
 single_label = "multi-label" not in (train_dataset.info['task'])
+if not single_label and args.use_predictor == True:
+    print("Warning: Particle Predictor is only compatible for multi-class datasets and is disabled for multi-label classification.")
+    args.use_predictor = not args.use_predictor
+
+
 pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
-best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta)
+best_position = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
 
 best = Particle(search_bounds)
 best.position = best_position

@@ -5,6 +5,10 @@ from particle import Particle
 from evaluation import evaluate_particle
 
 from data import best_architectures_multiclass, best_architectures_multilabel
+from models import ParticlePredictor
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
 
 class PSO:
   def __init__(self, num_particles, search_bounds, single_label, elite_init_ratio=0, w=0.729, c1=1.49445, c2=1.49445):
@@ -27,12 +31,15 @@ class PSO:
     self.global_best_fitness = float('inf')
     self.w, self.c1, self.c2, = w, c1, c2
 
-  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta):
+  def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor = False):
     # Evaluate initial population
     print(f"Evaluating Initial Population")
+    print("USE PREDICTOR",use_predictor)
+
     for i in range(len(self.particles)):
       parameters = self.particles[i].get_network_params()
-      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
+
+      fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
       print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
@@ -80,7 +87,7 @@ class PSO:
 
         # Evaluate Fitness
         parameters = self.particles[i].get_network_params()
-        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta)
+        fitness = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
         print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
@@ -93,6 +100,7 @@ class PSO:
         if particle.best_fitness < self.global_best_fitness:
           self.global_best_fitness = particle.best_fitness
           self.global_best_position = particle.best_position.copy()
+          print("new best fitness: ", particle.best_fitness)
 
       # Early Stopping: Check for fitness stagnation
       if (current_best_fitness - self.global_best_fitness) < 1e-4:
@@ -162,19 +170,34 @@ class PSO:
 
       return penalty * 100
 
-  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha=0.7, beta=0.3):
+  def objective_function(self, num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha=0.7, beta=0.3,use_predictor = False):
     """
     Returns fitness of a particle based on model evaluation metric and model complexity. Constrains values to within the search bounds and applies
     a penalty to particles that go outside of those bounds.
     """
+    #particle predictor
+    pp = ParticlePredictor()
+    pp.load_state_dict(torch.load("model", weights_only=True))
+    pp.eval()
 
     clipped_parameters = parameters.copy()
     parameter_keys = ['num_hidden_layers', 'hidden_layer_size', 'learning_rate', 'momentum', 'batch_size', 'weight_decay', 'dropout_rate']
     for parameter, (low, high) in zip(parameter_keys, search_bounds):
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
+
     # Model Performance
-    eval_metric1,eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
+    if use_predictor:
+      test_set = np.array(list(clipped_parameters.values()))
+      test_set  = (test_set - test_set.mean())/test_set.std()#zscore normalize
+      test_set_tensor = torch.tensor(test_set, dtype=torch.float32).unsqueeze(0)
+
+      with torch.no_grad(): #TODO: if we add f1_Score this will be schanged
+        for x, y in DataLoader(TensorDataset(test_set_tensor,torch.tensor([1])), batch_size=1):
+          eval_metric1 = eval_metric2 = pp(x).item()
+          print(eval_metric1)
+    else:
+      eval_metric1,eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
@@ -189,6 +212,6 @@ class PSO:
     print(f"Performance: {eval_metric2} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug
 
 
-    if(fitness == penalty): return 0 #avoid division by zero
+    if(fitness == penalty): return 10 #avoid division by zero #TODO this should return zero
     return 1/(fitness - penalty) #TODO GET RID OF THIS WHEN PSO GETS CHANGED - INVERT IT SO BEST FITNESS IS SMALLEST SO PSO PICKS IT
 
