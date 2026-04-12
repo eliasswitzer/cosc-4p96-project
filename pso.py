@@ -125,19 +125,8 @@ class PSO:
 
       history['pareto_data'].append(iteration_pareto)
 
-      # Add to metrics history
-      history['best_fitness'].append(self.global_best_fitness)
-      history['avg_fitness'].append(np.mean([p.best_fitness for p in self.particles]))
-      history['architectures'] = [p.get_network_params() for p in self.particles]
-
-      positions = np.array([p.position for p in self.particles])
-      swarm_spread = np.mean(np.std(positions, axis=0))
-      history['diversity'].append(swarm_spread)
-
-      history['pareto_data'].append(iteration_pareto)
-
       # Early Stopping: Check for fitness stagnation
-      if (current_best_fitness - self.global_best_fitness) < 1e-4:
+      if (self.global_best_fitness - current_best_fitness) < 1e-4:
          no_improvement_count += 1
       else:
          no_improvement_count = 0

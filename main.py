@@ -31,7 +31,7 @@ parser.add_argument('-b', '--beta', metavar='beta', type=float, required=False, 
 parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="blood", choices=["chest", "blood", "tissue", "oct"], help="The dataset the MLP will be trained on.")
 
 # Enable Particle Predictor
-parser.add_argument('-pred','--use_predictor', metavar = 'use_predictor', type = bool, required = False, default =False, help = "Enable the particle predictor to significantly speed up particle evaluation at the expense of some accuracy (MULTI-CLASS ONLY)." )
+parser.add_argument('-pred','--use_predictor', action='store_true', help="Enable the particle predictor to significantly speed up particle evaluation at the expense of some accuracy (MULTI-CLASS ONLY).")
 
 # Neural Network Parameters
 parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False, default=10, help="The number of epochs to train each neural network for.")

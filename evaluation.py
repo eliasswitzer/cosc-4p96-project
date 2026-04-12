@@ -244,8 +244,7 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
 
   print(f"Final Test Evaluation Metrics: F1: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} | AUC: {test_auc:.4f} ")
-  print(evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs)
-  return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
+  return evaluation_metrics[0], evaluation_metrics[1]
 
 # a simplier version of the evaluate particle function for convienently collecting data about particles for training the predictor
 def collect_particle_data(best_parameters, train_dataset, test_dataset, input_dim, num_classes, g):
