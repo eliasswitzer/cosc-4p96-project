@@ -52,6 +52,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
     ham_loss = 0.0
     total_acc = 0.0
     avg_acc = 0.0
+    total_f1 =0.0
 
     with torch.no_grad():
       for images, labels in val_loader:
@@ -66,8 +67,9 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
         if single_label:
           y_pred = outputs.argmax(1)
           acc = y_pred == labels
-          total_acc += acc.cpu().numpy().astype(int).sum()/len(acc)
+          total_acc += acc.numpy().astype(int).sum()/len(acc)
 
+          total_f1 += f1_score_multiclass(y_pred,labels)
         else:
           tp, fp, fn = get_batch_metrics(outputs, labels)
           total_tp += tp
@@ -79,10 +81,11 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
 
     if single_label:
       avg_acc = total_acc / len(val_loader)
+      avg_f1 = total_f1 / len(val_loader)
 
       #when doing multi class we want to return thse
-      evaluation_metrics[0]+=avg_acc
-      evaluation_metrics[1]+=avg_acc #TODO: get f1 score working for this
+      evaluation_metrics[0]+=avg_f1
+      evaluation_metrics[1]+=avg_acc
 
     else:
       loss_history[epoch%overfitting_detection] = avg_val_loss
@@ -122,6 +125,42 @@ def hamming_loss(outputs,labels):
   preds = (outputs > 0).float()
   #numerator here is hamming distance, divide it by number of labels to get hamming loss
   return (np.sum(np.logical_xor(preds.cpu().numpy(), labels.cpu().numpy()),axis=1))/len(labels[0])
+
+def f1_score_multiclass(pred,labels):
+    """helper function to calculate f1 score for multi class"""
+    #conv to numpy and calculate accuracy and loss
+    #conv to numpy
+    numpy_pred = pred.cpu().numpy()
+    y_valid_numpy = labels.cpu().numpy()
+
+    numpy_pred = np.where(numpy_pred > 0.5 ,1,0)
+    numpy_pred = np.where(numpy_pred > 0 ,1,0)
+
+    #get tp
+    right_guesses = np.where((numpy_pred == y_valid_numpy),1,0) #get all instances where predictions = actual labels
+    tp = np.logical_and(right_guesses,y_valid_numpy) #get the predictions where they guess positive (1) label correct
+    tp = np.sum(tp.astype(int),axis=0)
+
+    #get fn
+    tn = np.logical_not(np.logical_or(numpy_pred,y_valid_numpy)) #get pred where neg (0) label was guessed correct. this is where y_pred=0 and labels = 0, so use nor gate
+    tn = np.sum(tn.astype(int),axis=0)
+
+    #false positive - where model guesses positive but its actually negative
+    wrong_guesses = np.logical_xor(numpy_pred,y_valid_numpy).astype(int) #instances where predictions != actual labels (1 =wrong)
+    fp = np.logical_and(wrong_guesses,numpy_pred) #if model guesses wrong (wrong=1) and pred is 1 (positive), means the label is actually 0 (neg). so when both these are 1 we have a fp
+    fp = np.sum(fp.astype(int),axis=0)
+
+    #boolean array of whether the model guessed correctly for each label, for each datapoint
+    correct_labels = numpy_pred == y_valid_numpy
+    #false negative - model guesses negative but its actually positive
+    fn = np.logical_and(wrong_guesses,np.logical_not(numpy_pred)) #if model is wrong, and pred is negative, label is 1. negate the pred label then and it with wrong_guess, this will be one if fn
+    fn=  np.sum(fn.astype(int),axis=0)
+
+    #do the calculations if denoms aren't 0, or else just set to 0
+    recall = np.where((tp+fn) ==0, 0, tp/(tp+fn))
+    precision = np.where((tp+fp)==0, 0, tp/(tp+fp))
+    f1 = np.where((precision+recall) ==0, 0, 2*(precision*recall)/(precision+recall) )
+    return f1
 
 
 def f1_score(tp, fp, fn):

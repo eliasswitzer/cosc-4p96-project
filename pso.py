@@ -70,7 +70,7 @@ class PSO:
 
       # Update velocities using local best
       for i in range(len(self.particles)):
-        print(f"Particle {i+1}")        
+        print(f"Particle {i+1}")
         # Find neighbor indices of current particle
         neighbor_indices = [(i + j) % len(self.particles) for j in range(-(neighborhood_size // 2), (neighborhood_size // 2) + 1)] # gets indices surrounding index i using neighborhood size (uses % to handle wrap-around)
 
@@ -216,10 +216,11 @@ class PSO:
       with torch.no_grad(): #TODO: if we add f1_Score this will be schanged
         for x, y in DataLoader(TensorDataset(test_set_tensor,torch.tensor([1])), batch_size=1):
           eval_metric1 = eval_metric2 = pp(x).item()
-          print(eval_metric1)
     else:
       eval_metric1, eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
     performance = eval_metric2
+    print("f", eval_metric1)
+
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)

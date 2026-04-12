@@ -24,7 +24,7 @@ def my_loss(output, target):
 
 #define some nn stuff
 model = ParticlePredictor().to(DEVICE)
-criterion = torch.nn.MSELoss() #my_loss
+criterion =   torch.nn.MSELoss() #my_loss
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
 #grab and format imported training data
@@ -33,6 +33,8 @@ train_set = np.array(list(training_data[0][0].values())) #do one pass manually t
 train_labels = np.array(training_data[0][1])
 for i in range(1,len(training_data)): #append everything in a 1d array
     #if training_data[i][1] <= 0.8 or randint(0,1) ==0: #50% chance to accept data over 80%
+        # if training_data[i][1] <= 0.5:  #set labels under a threshold to 0.5 to prevent model from trying hard to understand worthless data
+        #     training_data[i][1] = 0.5
         num_data+=1
         train_set = np.append(train_set, np.array(list(training_data[i][0].values())))
         train_labels = np.append(train_labels, np.array(training_data[i][1]))
@@ -69,6 +71,10 @@ for epoch in range(EPOCHS):
 
     if(epoch==0 or epoch%100==0):
         print(f"Average Loss: {avg_loss/len(dataloader)}")
+
+model = ParticlePredictor()
+model.load_state_dict(torch.load("model", weights_only=True))
+model.eval()
 
 #grab and format imported testing data
 test_set = np.array(list(testing_data[0][0].values())) #do one pass manually to initialize variables
