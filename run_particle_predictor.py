@@ -92,7 +92,7 @@ test_labels_tensor = torch.tensor(test_labels.reshape(-1,1), dtype=torch.float32
 test_set_tensor = torch.tensor(test_set, dtype=torch.float32)
 
 #save model
-torch.save(model.state_dict(),"model")
+#torch.save(model.state_dict(),"model")
 
 # debug: print out some of the labels
 model.eval()
@@ -104,5 +104,5 @@ for x, y in DataLoader(TensorDataset(test_set_tensor,test_labels_tensor), batch_
     loss = criterion(outputs, y)
     avg_loss +=loss.item()
     last_outputs = outputs
-print(avg_loss/10)
+print(avg_loss/25)
 print(last_outputs)
