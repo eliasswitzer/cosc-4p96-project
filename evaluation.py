@@ -66,7 +66,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
         if single_label:
           y_pred = outputs.argmax(1)
           acc = y_pred == labels
-          total_acc += acc.numpy().astype(int).sum()/len(acc)
+          total_acc += acc.cpu().numpy().astype(int).sum()/len(acc)
 
         else:
           tp, fp, fn = get_batch_metrics(outputs, labels)
@@ -203,7 +203,7 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
       if single_label:
         y_pred = outputs.argmax(1)
         acc = y_pred == labels
-        total_acc += acc.numpy().astype(int).sum()/len(acc)
+        total_acc += acc.cpu.numpy().astype(int).sum()/len(acc)
       else:
         tp, fp, fn = get_batch_metrics(outputs, labels)
         total_tp += tp
@@ -243,7 +243,7 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
     evaluation_metrics.append(ham_loss)
   print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
 
-  print(f"Final Test Evaluation Metrics: F1: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} | {test_auc:.4f} ")
+  print(f"Final Test Evaluation Metrics: F1: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} | AUC: {test_auc:.4f} ")
   print(evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs)
   return evaluation_metrics[0]/epochs, evaluation_metrics[1]/epochs
 
@@ -287,7 +287,7 @@ def collect_particle_data(best_parameters, train_dataset, test_dataset, input_di
       y_pred = outputs.argmax(1)
 
       acc = y_pred == labels
-      total_acc += acc.numpy().astype(int).sum()/len(acc)
+      total_acc += acc.cpu().numpy().astype(int).sum()/len(acc)
 
   avg_acc = total_acc / len(test_loader)
 

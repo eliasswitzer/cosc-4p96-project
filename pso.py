@@ -45,11 +45,12 @@ class PSO:
     print("USE PREDICTOR",use_predictor)
 
     for i in range(len(self.particles)):
+      print(f"Particle {i+1}")
       parameters = self.particles[i].get_network_params()
 
       fitness, _, _ = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
       #continue
-      print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
+      print(f"Fitness: {fitness:.4f} | Parameters: {parameters}")
 
       # Set Initial Personal Best
       self.particles[i].best_fitness = fitness
@@ -69,6 +70,7 @@ class PSO:
 
       # Update velocities using local best
       for i in range(len(self.particles)):
+        print(f"Particle {i+1}")        
         # Find neighbor indices of current particle
         neighbor_indices = [(i + j) % len(self.particles) for j in range(-(neighborhood_size // 2), (neighborhood_size // 2) + 1)] # gets indices surrounding index i using neighborhood size (uses % to handle wrap-around)
 
@@ -99,7 +101,7 @@ class PSO:
         parameters = self.particles[i].get_network_params()
         fitness, performance, complexity = self.objective_function(num_iterations, parameters, search_bounds, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor)
         iteration_pareto.append((performance, complexity))
-        print(f"Particle {i+1} | Fitness: {fitness:.4f} | Parameters: {parameters}")
+        print(f"Fitness: {fitness:.4f} | Parameters: {parameters}")
 
         # Update Personal Best
         if fitness > self.particles[i].best_fitness:
@@ -146,7 +148,7 @@ class PSO:
 
       # Early Stopping: Checking particle distance
       if swarm_spread < 1e-2:
-         print("Swarm has physically converged, stopping early!")
+         print("Swarm has converged, stopping early!")
          break
 
     best_position = self.global_best_position
