@@ -28,7 +28,7 @@ parser.add_argument('-a', '--alpha', metavar='alpha', type=float, required=False
 parser.add_argument('-b', '--beta', metavar='beta', type=float, required=False, default=0.3, help="The importance of model complexity in particle fitness.")
 
 # Datasets
-parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="blood", choices=["chest", "blood"], help="The dataset the MLP will be trained on.")
+parser.add_argument('--dataset', metavar='dataset', type=str, required=False, default="blood", choices=["chest", "blood", "tissue", "oct"], help="The dataset the MLP will be trained on.")
 
 # Enable Particle Predictor
 parser.add_argument('-pred','--use_predictor', metavar = 'use_predictor', type = bool, required = False, default =False, help = "Enable the particle predictor to significantly speed up particle evaluation at the expense of some accuracy (MULTI-CLASS ONLY)." )
@@ -50,15 +50,23 @@ torch.manual_seed(args.seed)
 g = torch.Generator().manual_seed(args.seed)
 
 # Load dataset
-from medmnist import ChestMNIST, BloodMNIST
+from medmnist import ChestMNIST, BloodMNIST, TissueMNIST, OCTMNIST
 if args.dataset == 'chest': # multi-label binary
     train_dataset = ChestMNIST(split='train', transform=transforms.ToTensor(), download=True)
     val_dataset = ChestMNIST(split='val', transform=transforms.ToTensor(), download=True)
     test_dataset = ChestMNIST(split='test', transform=transforms.ToTensor(), download=True)
-else: # multi-class
+elif args.dataset == 'blood': # multi-class
     train_dataset = BloodMNIST(split='train', transform=transforms.ToTensor(), download=True)
     val_dataset = BloodMNIST(split='val', transform=transforms.ToTensor(), download=True)
     test_dataset = BloodMNIST(split='test', transform=transforms.ToTensor(), download=True)
+elif args.dataset == 'tissue': # multi-class
+    train_dataset = TissueMNIST(split='train', transform=transforms.ToTensor(), download=True)
+    val_dataset = TissueMNIST(split='val', transform=transforms.ToTensor(), download=True)
+    test_dataset = TissueMNIST(split='test', transform=transforms.ToTensor(), download=True)
+else: # multi-class
+    train_dataset = OCTMNIST(split='train', transform=transforms.ToTensor(), download=True)
+    val_dataset = OCTMNIST(split='val', transform=transforms.ToTensor(), download=True)
+    test_dataset = OCTMNIST(split='test', transform=transforms.ToTensor(), download=True)
 
 num_classes = len(train_dataset.info['label'])
 input_dim = int(np.prod(train_dataset[0][0].shape))
@@ -87,7 +95,8 @@ if args.visualize:
     plot_fitness(history)
     plot_diversity(history)
     plot_distribution(history)
-    plot_pareto(history)
+    single_label = "multi-label" not in (test_dataset.info['task'])
+    plot_pareto(history, single_label)
 
 best = Particle(search_bounds)
 best.position = best_position
