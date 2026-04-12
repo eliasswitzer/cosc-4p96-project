@@ -34,7 +34,7 @@ def plot_distribution(history):
     axes[1].set_title("Distribution of Hidden Layer Sizes")
     plt.show()
 
-def plot_pareto(history):
+def plot_pareto(history, single_label=True):
     points = np.array(history['pareto_data'][-1]) # get points from final iteration
 
     pareto = []
@@ -43,9 +43,16 @@ def plot_pareto(history):
         for j, (p_j , c_j) in enumerate(points):
             if i == j:
                 continue
-            if (p_j <= p_i and c_j <= c_i) and (p_j < p_i or c_j < c_i):
-                dominated = True
-                break
+            if single_label:
+                # Maximize performance (accuracy) and minimize complexity
+                if (p_j >= p_i and c_j <= c_i) and (p_j > p_i or c_j < c_i):
+                    dominated = True
+                    break
+            else:
+                # Minimize both performance (hamming loss) and complexity
+                if (p_j <= p_i and c_j <= c_i) and (p_j < p_i or c_j < c_i):
+                    dominated = True
+                    break
         if not dominated:
             pareto.append((p_i, c_i))
     

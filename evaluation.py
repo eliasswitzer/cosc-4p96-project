@@ -203,7 +203,7 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
       if single_label:
         y_pred = outputs.argmax(1)
         acc = y_pred == labels
-        total_acc += acc.cpu.numpy().astype(int).sum()/len(acc)
+        total_acc += acc.cpu().numpy().astype(int).sum()/len(acc)
       else:
         tp, fp, fn = get_batch_metrics(outputs, labels)
         total_tp += tp
