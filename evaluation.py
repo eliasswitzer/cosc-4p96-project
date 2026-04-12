@@ -60,7 +60,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
         else:
           images, labels = images.to(device),  labels.float().to(device) #for multi label
         outputs = model(images)
-        val_loss += criterion(model(images), labels).item()
+        val_loss += criterion(outputs, labels).item()
 
         #for multi-class
         if single_label:
@@ -93,7 +93,10 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
       evaluation_metrics[0]+=val_f1
       evaluation_metrics[1]+=ham_loss
 
-    print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Validation F1: {val_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
+    if single_label:
+      print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Acc: {avg_acc}")
+    else:
+      print(f"Epoch {epoch+1}/{epochs} | Validation Loss: {avg_val_loss} | Hamming Loss: {ham_loss}")
 
     #check overfitting
     if not np.all(np.isnan(loss_history)):
@@ -241,7 +244,11 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
     #when doing multi label we want to return these
     evaluation_metrics.append(test_f1)
     evaluation_metrics.append(ham_loss)
-  print(f"Epoch {epoch+1}/{epochs} | Validation F1: {test_f1} | Hamming Loss: {ham_loss} | Acc: {avg_acc}")
+
+  if single_label:
+    print(f"Epoch {epoch+1}/{epochs} | Acc: {avg_acc}")
+  else:
+    print(f"Epoch {epoch+1}/{epochs} | Hamming Loss: {ham_loss}")
 
   print(f"Final Test Evaluation Metrics: F1: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} | AUC: {test_auc:.4f} ")
   return evaluation_metrics[0], evaluation_metrics[1]

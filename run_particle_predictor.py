@@ -95,7 +95,7 @@ last_outputs = 0
 for x, y in DataLoader(TensorDataset(test_set_tensor,test_labels_tensor), batch_size=20):
     x, y = x.to(DEVICE), y.to(DEVICE)
     outputs = model(x)
-    loss = criterion(model(x), y)
+    loss = criterion(outputs, y)
     avg_loss +=loss.item()
     last_outputs = outputs
 print(avg_loss/10)
