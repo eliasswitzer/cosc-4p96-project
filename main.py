@@ -6,7 +6,7 @@ from torchvision import transforms
 
 from pso import PSO, Particle
 from evaluation import test_model
-from visualizations import plot_fitness, plot_distribution, plot_diversity, plot_pareto
+from visualizations import plot_fitness, plot_distribution, plot_diversity, plot_pareto, num_particles_visual, neighborhood_size_visual
 
 # Arguments
 parser = argparse.ArgumentParser()
@@ -17,11 +17,11 @@ parser.add_argument('-s', '--seed', metavar="seed", type=int, required=True, hel
 parser.add_argument('-w', metavar='w', type=float, required=False, default=0.729, help="The inertia term weight for PSO algorithm.")
 parser.add_argument('-c1', metavar='c1', type=float, required=False, default=1.49445, help="The cognitive acceleration coefficient for PSO algorithm.")
 parser.add_argument('-c2', metavar='c2', type=float, required=False, default=1.49445, help="The social acceleration coefficient for PSO algorithm.")
-parser.add_argument('-i', '--iterations', metavar='iterations', type=int, required=False, default=10, help="The number of iterations to run the PSO algorithm for")
-parser.add_argument('-np', '--particles', metavar='particles', type=int, required=False, default=10, help="The number of particles to run the PSO algorithm with.")
+parser.add_argument('-i', '--iterations', metavar='iterations', type=int, required=False, default=20, help="The number of iterations to run the PSO algorithm for")
+parser.add_argument('-np', '--particles', metavar='particles', type=int, required=False, default=30, help="The number of particles to run the PSO algorithm with.")
 parser.add_argument('-p', '--patience', metavar='patience', type=int, required=False, default=5, help="The number of iterations to test for fitness stagation for early stopping.")
 parser.add_argument('-ns', '--neighborhood_size', metavar='neighborhood_size', type=int, required=False, default=3, help="The neighborhood size for local-best PSO algorithm.")
-parser.add_argument('-er', '--elite_ratio', metavar='elite_ratio', required=False, default=0, type = int, help="The probability of selecting an elite particle for initialization.")
+parser.add_argument('-er', '--elite_ratio', metavar='elite_ratio', required=False, default=0, type = float, help="The probability of selecting an elite particle for initialization.")
 
 # Objective Function Parameters
 parser.add_argument('-a', '--alpha', metavar='alpha', type=float, required=False, default=0.7, help="The importance of model performance in particle fitness.")
@@ -39,6 +39,9 @@ parser.add_argument('-e', '--epochs', metavar='epochs', type=int, required=False
 # Main Components
 parser.add_argument('--visualize', action='store_true', help="If included, displays all visualizations.")
 parser.add_argument('--final_test', action='store_true', help="If included, trains the best found architecture for 50 epochs and tests it on the test data.")
+parser.add_argument('--no_main_loop', action='store_true', help="If included, skips the main PSO loop")
+parser.add_argument('--ns_sim', action='store_true', help="If included, runs the neighborhood size simulation.")
+parser.add_argument('--np_sim', action='store_true', help="If included, runs the number of particles simulation.")
 
 args = parser.parse_args()
 
@@ -87,22 +90,43 @@ if not single_label and args.use_predictor == True:
     print("Warning: Particle Predictor is only compatible for multi-class datasets and is disabled for multi-label classification.")
     args.use_predictor = not args.use_predictor
 
+if not args.no_main_loop:
+    pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
+    best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
 
-pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
-best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
+    if args.visualize:
+        plot_fitness(history)
+        plot_diversity(history)
+        plot_distribution(history)
+        single_label = "multi-label" not in (test_dataset.info['task'])
+        plot_pareto(history, single_label)
 
-if args.visualize:
-    plot_fitness(history)
-    plot_diversity(history)
-    plot_distribution(history)
-    single_label = "multi-label" not in (test_dataset.info['task'])
-    plot_pareto(history, single_label)
+    best = Particle(search_bounds)
+    best.position = best_position
+    best_parameters = best.get_network_params()
+    print("Best architecture found:", best.get_network_params())
 
-best = Particle(search_bounds)
-best.position = best_position
-best_parameters = best.get_network_params()
-print("Best architecture found:", best.get_network_params())
+    if args.final_test:
+        final_f1, _ = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
 
-if args.final_test:
-    final_f1, _ = test_model(best_parameters=best_parameters, train_dataset=train_dataset, test_dataset=test_dataset, input_dim=input_dim, num_classes=num_classes, g=g)
+if args.ns_sim:
+    ns_to_test = [2, 5, 10]
+    all_histories = {}
+    for ns in ns_to_test:
+        print(f"Testing Neighborhood Size: {ns}")
+        pso = PSO(num_particles=args.particles, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
+        best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, ns, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
+        all_histories[ns] = history
 
+    neighborhood_size_visual(all_histories)
+
+if args.np_sim:
+    np_to_test = [5, 10, 20, 30]
+    all_histories = {}
+    for num in np_to_test:
+        print(f"Testing Number of Particles: {num}")
+        pso = PSO(num_particles=num, search_bounds=search_bounds, elite_init_ratio = args.elite_ratio, single_label=single_label, w=args.w, c1=args.c1, c2=args.c2)
+        best_position, history = pso.optimize(args.iterations, search_bounds, args.patience, args.neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, args.epochs, g, alpha=args.alpha, beta=args.beta, use_predictor=args.use_predictor)
+        all_histories[num] = np_to_test
+
+    num_particles_visual(all_histories)

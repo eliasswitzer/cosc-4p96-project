@@ -73,3 +73,25 @@ def plot_pareto(history, single_label=True):
     plt.legend()
     plt.grid(True)
     plt.show()
+
+def neighborhood_size_visual(all_histories):
+    plt.figure(figsize=(10,6))
+    for ns, hist in all_histories.items():
+        plt.plot(hist['avg_fitness'], label=f"Neighborhood Size: {ns}")
+    
+    plt.title("Impact of Neighborhood Size on Average Fitness")
+    plt.xlabel("Iteration")
+    plt.ylabel("Average Fitness")
+    plt.legend()
+    plt.show()
+
+def num_particles_visual(all_histories):
+    plt.figure(figsize=(10,6))
+    for num, hist in all_histories.items():
+        plt.plot(hist['avg_fitness'], label=f"Neighborhood Size: {num}")
+
+    plt.title("Impact of Number of Particles on Average Fitness")
+    plt.xlabel("Iteration")
+    plt.ylabel("Average Fitness")
+    plt.legend()
+    plt.show()

@@ -67,7 +67,7 @@ def evaluate_particle(parameters, train_dataset, val_dataset, input_dim, num_cla
         if single_label:
           y_pred = outputs.argmax(1)
           acc = y_pred == labels
-          total_acc += acc.numpy().astype(int).sum()/len(acc)
+          total_acc += acc.cpu().numpy().astype(int).sum()/len(acc)
 
           total_f1 += f1_score_multiclass(y_pred,labels)
         else:
@@ -289,7 +289,10 @@ def test_model(best_parameters, train_dataset, test_dataset, input_dim, num_clas
   else:
     print(f"Epoch {epoch+1}/{epochs} | Hamming Loss: {ham_loss}")
 
-  print(f"Final Test Evaluation Metrics: F1: {test_f1:.4f}  | Hamming Loss: {ham_loss:.4f} | Acc: {avg_acc:.4f} | AUC: {test_auc:.4f} ")
+  if single_label:
+    print(f"Final Test Evaluation Metrics: Acc: {avg_acc:.4f} | AUC: {test_auc:.4f} ")
+  else:
+    print(f"Final Test Evaluation Metrics: Hamming Loss: {ham_loss:.4f} | AUC: {test_auc:.4f} ")
   return evaluation_metrics[0], evaluation_metrics[1]
 
 # a simplier version of the evaluate particle function for convienently collecting data about particles for training the predictor

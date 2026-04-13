@@ -29,7 +29,7 @@ class PSO:
 
     self.global_best_position = None
     self.global_best_fitness = -float('inf')
-    self.w, self.c1, self.c2, = w, c1, c2
+    self.w, self.c1, self.c2 = w, c1, c2
 
   def optimize(self, num_iterations, search_bounds, patience, neighborhood_size, train_dataset, val_dataset, input_dim, num_classes, epochs, generator, alpha, beta,use_predictor=False):
     history = { # store metrics for visualization
@@ -206,7 +206,6 @@ class PSO:
     for parameter, (low, high) in zip(parameter_keys, search_bounds):
       clipped_parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
 
-
     # Model Performance
     if use_predictor:
       test_set = np.array(list(clipped_parameters.values()))
@@ -220,7 +219,6 @@ class PSO:
       eval_metric1, eval_metric2 = evaluate_particle(clipped_parameters, train_dataset, val_dataset, input_dim, num_classes, epochs=epochs, g=generator) #for multi-class: (acc,acc) multi-label: (f1,ham)
     performance = eval_metric2
     print("f", eval_metric1)
-
 
     # Model Complexity
     complexity = self.get_complexity_score(clipped_parameters, search_bounds, input_dim, num_classes)
@@ -238,6 +236,11 @@ class PSO:
     else:
        penalty = min(penalty / fitness, 1.0) * fitness #scales this so penalty takes a percentage out of fitness based on how large it is
        fitness_adjusted = fitness - penalty
+
+    # clip actual parameters to prevent from returning an infeasible solution
+    for parameter, (low, high) in zip(parameters, search_bounds):
+      parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
+
 
     print(f"Performance: {performance} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug=
 
