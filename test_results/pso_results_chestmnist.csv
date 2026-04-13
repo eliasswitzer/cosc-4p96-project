@@ -1,0 +1,2 @@
+Random Seed,Hidden Layers,Hidden Layer Size,Learning Rate,Momentum,Batch Size,Weight Decay,DropoutRate,Iterations Before Stopping,Final Test Hamming Loss,Final Test AUC
+30,3,27,0.00935,0.12196,0.00015,0.37567,9,0.1526,0.6596
