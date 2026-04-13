@@ -103,6 +103,11 @@ class PSO:
         iteration_pareto.append((performance, complexity))
         print(f"Fitness: {fitness:.4f} | Parameters: {parameters}")
 
+        # Clip Position into Search Bounds
+        low = np.array([b[0] for b in search_bounds])
+        high = np.array([b[1] for b in search_bounds])
+        self.particles[i].position = np.clip(self.particles[i].position, low, high)
+
         # Update Personal Best
         if fitness > self.particles[i].best_fitness:
           self.particles[i].best_fitness = fitness
@@ -236,11 +241,6 @@ class PSO:
     else:
        penalty = min(penalty / fitness, 1.0) * fitness #scales this so penalty takes a percentage out of fitness based on how large it is
        fitness_adjusted = fitness - penalty
-
-    # clip actual parameters to prevent from returning an infeasible solution
-    for parameter, (low, high) in zip(parameters, search_bounds):
-      parameters[parameter] = max(low, min(high, parameters[parameter])) # ensure the value of each parameter is within the search bounds
-
 
     print(f"Performance: {performance} | Complexity: {(1-complexity)} | Penalty: {penalty}") # debug=
 
